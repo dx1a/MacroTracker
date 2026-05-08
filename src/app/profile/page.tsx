@@ -38,12 +38,12 @@ const GOALS: { value: Goal; label: string; desc: string; color: string }[] = [
   { value: "lean_bulk", label: "Lean Bulk", desc: "~0.25 lb/week · Slow build", color: "var(--color-protein)" },
 ];
 
-const ACTIVITIES: { value: Activity; label: string }[] = [
-  { value: "sedentary", label: "Sedentary — desk job, minimal movement" },
-  { value: "light", label: "Light — 1-3 workouts/week" },
-  { value: "moderate", label: "Moderate — 3-5 workouts/week" },
-  { value: "active", label: "Active — 6-7 workouts/week" },
-  { value: "very_active", label: "Very Active — physical job + training" },
+const ACTIVITIES: { value: Activity; label: string; sub: string }[] = [
+  { value: "sedentary", label: "Sedentary", sub: "Desk job or minimal daily movement, no structured exercise" },
+  { value: "light", label: "Exercise", sub: "15–30 minutes of elevated heart rate activity" },
+  { value: "moderate", label: "Intense Exercise", sub: "45–120 minutes of elevated heart rate activity" },
+  { value: "active", label: "Very Intense Exercise", sub: "2+ hours of elevated heart rate activity" },
+  { value: "very_active", label: "Very Intense Exercise (Daily)", sub: "2+ hours daily, or physically demanding job + training" },
 ];
 
 export default function ProfilePage() {
@@ -239,7 +239,7 @@ export default function ProfilePage() {
         <div className="card">
           <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "1rem" }}>Activity Level</h3>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            {ACTIVITIES.map(({ value, label }) => (
+            {ACTIVITIES.map(({ value, label, sub }) => (
               <button
                 key={value}
                 onClick={() => setField("activityLevel", value)}
@@ -247,12 +247,11 @@ export default function ProfilePage() {
                   padding: "0.75rem 1rem", borderRadius: "0.625rem", border: "1px solid",
                   borderColor: form.activityLevel === value ? "var(--color-primary)" : "var(--color-border)",
                   backgroundColor: form.activityLevel === value ? "color-mix(in srgb, var(--color-primary) 12%, transparent)" : "transparent",
-                  color: form.activityLevel === value ? "var(--color-primary-light)" : "var(--color-foreground)",
-                  textAlign: "left", cursor: "pointer", fontSize: "0.875rem", fontWeight: form.activityLevel === value ? 600 : 400,
-                  transition: "all 0.15s",
+                  textAlign: "left", cursor: "pointer", transition: "all 0.15s",
                 }}
               >
-                {label}
+                <p style={{ fontSize: "0.875rem", fontWeight: 600, color: form.activityLevel === value ? "var(--color-primary-light)" : "var(--color-foreground)" }}>{label}</p>
+                <p style={{ fontSize: "0.75rem", color: "var(--color-muted)", marginTop: "0.1rem" }}>{sub}</p>
               </button>
             ))}
           </div>

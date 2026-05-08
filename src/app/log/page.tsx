@@ -9,6 +9,7 @@ import { FoodSearch } from "@/components/food/FoodSearch";
 import { AddFoodModal } from "@/components/food/AddFoodModal";
 import { CreateFoodModal } from "@/components/food/CreateFoodModal";
 import { MacroBar } from "@/components/dashboard/MacroBar";
+import { CarbFatBudget } from "@/components/dashboard/CarbFatBudget";
 import { useDashboard } from "@/store/useDashboard";
 
 type Meal = "breakfast" | "lunch" | "dinner" | "snacks";
@@ -152,8 +153,14 @@ export default function LogPage() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
             <MacroBar label="Protein" value={totals.p} target={proteinTarget} color="var(--color-protein)" />
-            <MacroBar label="Carbs" value={totals.c} target={carbTarget} color="var(--color-carbs)" />
-            <MacroBar label="Fat" value={totals.f} target={fatTarget} color="var(--color-fat)" />
+            <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "0.75rem" }}>
+              <CarbFatBudget
+                carbs={totals.c}
+                fat={totals.f}
+                calorieTarget={calorieTarget}
+                proteinTarget={proteinTarget}
+              />
+            </div>
           </div>
         </div>
 

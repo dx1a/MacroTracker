@@ -11,6 +11,7 @@ import {
 import { AppLayout } from "@/components/layout/AppLayout";
 import { MacroRing } from "@/components/dashboard/MacroRing";
 import { MacroBar } from "@/components/dashboard/MacroBar";
+import { CarbFatBudget } from "@/components/dashboard/CarbFatBudget";
 import { WeightChart } from "@/components/dashboard/WeightChart";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { SuggestionBanner } from "@/components/dashboard/SuggestionBanner";
@@ -130,8 +131,14 @@ export default function DashboardPage() {
               Macros
             </h3>
             <MacroBar label="Protein" value={todayMacros.protein} target={proteinTarget} color="var(--color-protein)" />
-            <MacroBar label="Carbs" value={todayMacros.carbs} target={carbTarget} color="var(--color-carbs)" />
-            <MacroBar label="Fat" value={todayMacros.fat} target={fatTarget} color="var(--color-fat)" />
+            <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: "1rem" }}>
+              <CarbFatBudget
+                carbs={todayMacros.carbs}
+                fat={todayMacros.fat}
+                calorieTarget={calorieTarget}
+                proteinTarget={proteinTarget}
+              />
+            </div>
 
             {/* Micro info */}
             {(todayMacros.fiber > 0 || todayMacros.sodium > 0) && (
