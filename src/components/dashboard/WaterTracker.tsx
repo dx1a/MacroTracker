@@ -41,7 +41,7 @@ export function WaterTracker({ initialMl, goalMl, date, isAutoGoal }: WaterTrack
     save(next);
   }
 
-  const fillY = 130 * (1 - pct);
+  const fillY = 134 * (1 - pct);
   const isGoalMet = pct >= 1;
 
   return (
