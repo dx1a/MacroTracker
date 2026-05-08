@@ -39,11 +39,11 @@ const GOALS: { value: Goal; label: string; desc: string; color: string }[] = [
 ];
 
 const ACTIVITIES: { value: Activity; label: string; sub: string }[] = [
-  { value: "sedentary", label: "Sedentary", sub: "Desk job or minimal daily movement, no structured exercise" },
-  { value: "light", label: "Exercise", sub: "15–30 minutes of elevated heart rate activity" },
-  { value: "moderate", label: "Intense Exercise", sub: "45–120 minutes of elevated heart rate activity" },
-  { value: "active", label: "Very Intense Exercise", sub: "2+ hours of elevated heart rate activity" },
-  { value: "very_active", label: "Very Intense Exercise (Daily)", sub: "2+ hours daily, or physically demanding job + training" },
+  { value: "sedentary", label: "Sedentary", sub: "Little or no exercise · desk job or minimal daily movement" },
+  { value: "light", label: "Light · 1–3×/week", sub: "Exercise (15–30 min of elevated heart rate)" },
+  { value: "moderate", label: "Moderate · 4–5×/week", sub: "Intense Exercise (45–120 min of elevated heart rate)" },
+  { value: "active", label: "Active · 6–7×/week", sub: "Very Intense Exercise (2+ hours of elevated heart rate)" },
+  { value: "very_active", label: "Very Active · Daily", sub: "Very Intense Exercise daily, or physically demanding job + training" },
 ];
 
 export default function ProfilePage() {
