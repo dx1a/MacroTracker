@@ -3,11 +3,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, ChevronLeft, ChevronRight, PlusCircle } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, ChevronRight, PlusCircle, Zap } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { FoodSearch } from "@/components/food/FoodSearch";
 import { AddFoodModal } from "@/components/food/AddFoodModal";
 import { CreateFoodModal } from "@/components/food/CreateFoodModal";
+import { QuickAddModal } from "@/components/food/QuickAddModal";
 import { MacroBar } from "@/components/dashboard/MacroBar";
 import { CarbFatBudget } from "@/components/dashboard/CarbFatBudget";
 import { useDashboard } from "@/store/useDashboard";
@@ -73,6 +74,7 @@ export default function LogPage() {
   const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
   const [activeMeal, setActiveMeal] = useState<Meal>("breakfast");
   const [showCreate, setShowCreate] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
 
   const profile = dashData?.profile;
   const calorieTarget = profile?.adaptiveCalories ?? profile?.calorieTarget ?? 2000;
@@ -186,13 +188,22 @@ export default function LogPage() {
         <div className="card">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "0.75rem" }}>
             <h3 style={{ fontSize: "1rem", fontWeight: 700 }}>Add Food</h3>
-            <button
-              className="btn-ghost"
-              onClick={() => setShowCreate(true)}
-              style={{ fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.4rem" }}
-            >
-              <PlusCircle size={14} /> Create Custom Food
-            </button>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              <button
+                className="btn-ghost"
+                onClick={() => setShowQuickAdd(true)}
+                style={{ fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.4rem" }}
+              >
+                <Zap size={14} /> Quick Add
+              </button>
+              <button
+                className="btn-ghost"
+                onClick={() => setShowCreate(true)}
+                style={{ fontSize: "0.8rem", display: "flex", alignItems: "center", gap: "0.4rem" }}
+              >
+                <PlusCircle size={14} /> Create Food
+              </button>
+            </div>
           </div>
 
           {/* Meal quick-select */}
@@ -342,6 +353,15 @@ export default function LogPage() {
             setSelectedFood(food);
             setShowCreate(false);
           }}
+        />
+      )}
+
+      {showQuickAdd && (
+        <QuickAddModal
+          meal={activeMeal}
+          date={date}
+          onClose={() => setShowQuickAdd(false)}
+          onAdded={fetchLog}
         />
       )}
     </AppLayout>
