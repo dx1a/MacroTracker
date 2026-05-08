@@ -11,6 +11,7 @@ import {
   LogOut,
   Zap,
 } from "lucide-react";
+import { ThemeToggle } from "./ThemeToggle";
 
 const nav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -39,7 +40,7 @@ export function Sidebar() {
       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.5rem 0.75rem", marginBottom: "1rem" }}>
         <div style={{
           width: "32px", height: "32px", borderRadius: "8px",
-          background: "linear-gradient(135deg, var(--color-primary), #6d28d9)",
+          background: "linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))",
           display: "flex", alignItems: "center", justifyContent: "center",
         }}>
           <Zap size={18} color="white" />
@@ -77,6 +78,8 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      <ThemeToggle />
 
       {/* Sign out */}
       <button
