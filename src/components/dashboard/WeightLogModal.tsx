@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { Scale, X, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useDashboard } from "@/store/useDashboard";
+import { localDateStr } from "@/lib/date";
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return localDateStr();
 }
 
 function displayDate(dateStr: string): string {
@@ -48,7 +49,7 @@ export function WeightLogModal() {
     await fetch("/api/weight", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ weight: parseFloat(weight), date, note }),
+      body: JSON.stringify({ weight: parseFloat(weight), date, note, localToday: todayStr() }),
     });
     setLoading(false);
     setSuccess(true);

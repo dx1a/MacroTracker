@@ -15,6 +15,7 @@ import {
 } from "@/lib/calculations";
 import { getGoalLabel, getActivityLabel, formatDate } from "@/lib/utils";
 import { useDashboard } from "@/store/useDashboard";
+import { getPreferredTimezone, setPreferredTimezone, isValidTimezone } from "@/lib/date";
 
 type Gender = "male" | "female" | "other";
 type Activity = "sedentary" | "light" | "moderate" | "active" | "very_active";
@@ -399,6 +400,9 @@ export default function ProfilePage() {
           </div>
         )}
 
+        {/* Timezone */}
+        <TimezoneCard />
+
         {saveError && (
           <div style={{
             padding: "0.875rem 1rem", borderRadius: "0.75rem",
@@ -425,3 +429,74 @@ export default function ProfilePage() {
     </AppLayout>
   );
 }
+
+function TimezoneCard() {
+  const [tz, setTz] = useState(() => getPreferredTimezone());
+  const [draft, setDraft] = useState(() => getPreferredTimezone());
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+
+  const detected = typeof window !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "";
+  const isOverridden = tz !== detected;
+
+  function handleSave() {
+    if (!isValidTimezone(draft)) {
+      setError("Invalid timezone — use IANA format, e.g. America/New_York");
+      return;
+    }
+    setError("");
+    setPreferredTimezone(draft);
+    setTz(draft);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  function handleReset() {
+    setPreferredTimezone(detected);
+    setTz(detected);
+    setDraft(detected);
+  }
+
+  return (
+    <div className="card">
+      <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "0.25rem" }}>Timezone</h3>
+      <p style={{ fontSize: "0.78rem", color: "var(--color-muted)", marginBottom: "1rem" }}>
+        Controls which day your logs are assigned to.{" "}
+        {isOverridden
+          ? <span style={{ color: "var(--color-warning)", fontWeight: 600 }}>Custom override active</span>
+          : <span>Auto-detected: <strong>{detected}</strong></span>}
+      </p>
+      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "flex-start" }}>
+        <input
+          className="input"
+          style={{ maxWidth: "260px" }}
+          value={draft}
+          onChange={(e) => { setDraft(e.target.value); setError(""); }}
+          placeholder="e.g. America/New_York"
+          list="tz-suggestions"
+        />
+        <datalist id="tz-suggestions">
+          {COMMON_TZ.map((t) => <option key={t} value={t} />)}
+        </datalist>
+        <button className="btn-primary" onClick={handleSave} style={{ padding: "0.625rem 1rem", whiteSpace: "nowrap" }}>
+          {saved ? "✓ Saved" : "Set Timezone"}
+        </button>
+        {isOverridden && (
+          <button className="btn-ghost" onClick={handleReset} style={{ padding: "0.625rem 1rem", whiteSpace: "nowrap" }}>
+            Reset to auto
+          </button>
+        )}
+      </div>
+      {error && <p style={{ fontSize: "0.78rem", color: "var(--color-danger)", marginTop: "0.5rem" }}>{error}</p>}
+    </div>
+  );
+}
+
+const COMMON_TZ = [
+  "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
+  "America/Phoenix", "America/Anchorage", "Pacific/Honolulu",
+  "America/Toronto", "America/Vancouver",
+  "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Moscow",
+  "Asia/Dubai", "Asia/Kolkata", "Asia/Singapore", "Asia/Tokyo",
+  "Australia/Sydney", "Pacific/Auckland",
+];

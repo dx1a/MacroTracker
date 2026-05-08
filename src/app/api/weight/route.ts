@@ -8,6 +8,7 @@ const weightSchema = z.object({
   weight: z.number().min(50).max(700),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   note: z.string().max(500).optional(),
+  localToday: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { weight, date, note } = weightSchema.parse(body);
+    const { weight, date, note, localToday } = weightSchema.parse(body);
 
     const entry = await prisma.weightLog.upsert({
       where: {
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
 
     // Only update profile currentWeight when logging today's weight.
     // Backfilling a past date should not overwrite the most recent known weight.
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localToday ?? new Date().toISOString().slice(0, 10);
     if (date === today) {
       await prisma.profile.upsert({
         where: { userId: session.user.id },

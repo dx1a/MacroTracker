@@ -16,8 +16,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const today = new Date();
-  const todayStr = format(today, "yyyy-MM-dd");
+  const { searchParams } = new URL(req.url);
+  const clientDate = searchParams.get("date");
+  // Use client's local date if provided (avoids UTC vs local timezone mismatch)
+  const todayStr = clientDate && /^\d{4}-\d{2}-\d{2}$/.test(clientDate)
+    ? clientDate
+    : format(new Date(), "yyyy-MM-dd");
+  const today = new Date(todayStr + "T12:00:00Z"); // noon UTC avoids DST edge cases
 
   const [profile, todayLog, weightLogs, last7DaysLogs, todayWater] = await Promise.all([
     prisma.profile.findUnique({ where: { userId: session.user.id } }),

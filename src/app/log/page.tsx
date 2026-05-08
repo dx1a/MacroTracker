@@ -12,6 +12,7 @@ import { QuickAddModal } from "@/components/food/QuickAddModal";
 import { MacroBar } from "@/components/dashboard/MacroBar";
 import { CarbFatBudget } from "@/components/dashboard/CarbFatBudget";
 import { useDashboard } from "@/store/useDashboard";
+import { localDateStr } from "@/lib/date";
 
 type Meal = "breakfast" | "lunch" | "dinner" | "snacks";
 
@@ -52,7 +53,7 @@ function offsetDate(base: string, days: number): string {
 }
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return localDateStr();
 }
 
 function displayDate(dateStr: string): string {

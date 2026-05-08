@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { localDateStr } from "@/lib/date";
 
 interface DashboardState {
   data: DashboardPayload | null;
@@ -32,7 +33,7 @@ export const useDashboard = create<DashboardState>((set, get) => ({
   fetch: async () => {
     set({ loading: true, error: null });
     try {
-      const res = await fetch("/api/dashboard");
+      const res = await fetch(`/api/dashboard?date=${localDateStr()}`);
       if (!res.ok) throw new Error("Failed to load dashboard");
       const data = await res.json();
       set({ data, loading: false });

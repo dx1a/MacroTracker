@@ -20,12 +20,13 @@ import { WaterTracker } from "@/components/dashboard/WaterTracker";
 import { useDashboard } from "@/store/useDashboard";
 import { formatDate, getGoalLabel } from "@/lib/utils";
 import { calculateTimeline, calculateWaterGoal } from "@/lib/calculations";
+import { localDateStr } from "@/lib/date";
 
 export default function DashboardPage() {
   const { status } = useSession();
   const router = useRouter();
   const { data, loading, fetch } = useDashboard();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = localDateStr();
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
