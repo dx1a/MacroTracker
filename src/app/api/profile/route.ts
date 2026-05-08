@@ -110,7 +110,9 @@ export async function PUT(req: NextRequest) {
         bmr: Math.round(bmr),
         tdee,
         calorieTarget,
-        ...macros,
+        proteinTarget: macros.protein,
+        carbTarget: macros.carbs,
+        fatTarget: macros.fat,
       };
     }
 
