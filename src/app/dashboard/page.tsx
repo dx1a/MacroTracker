@@ -135,6 +135,8 @@ export default function DashboardPage() {
               <CarbFatBudget
                 carbs={todayMacros.carbs}
                 fat={todayMacros.fat}
+                carbTarget={carbTarget}
+                fatTarget={fatTarget}
                 calorieTarget={calorieTarget}
                 proteinTarget={proteinTarget}
               />

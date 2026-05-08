@@ -157,6 +157,8 @@ export default function LogPage() {
               <CarbFatBudget
                 carbs={totals.c}
                 fat={totals.f}
+                carbTarget={carbTarget}
+                fatTarget={fatTarget}
                 calorieTarget={calorieTarget}
                 proteinTarget={proteinTarget}
               />
