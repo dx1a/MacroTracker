@@ -47,6 +47,8 @@ model Profile {
   lastAdaptiveCheck    DateTime?
   adaptiveAdjustments  Int      @default(0)
 
+  waterGoal      Int?      // ml per day; null = auto-calculated from stats
+
   updatedAt      DateTime @updatedAt
 }
 

@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");
 
-  const [profile, todayLog, weightLogs, last7DaysLogs] = await Promise.all([
+  const [profile, todayLog, weightLogs, last7DaysLogs, todayWater] = await Promise.all([
     prisma.profile.findUnique({ where: { userId: session.user.id } }),
     prisma.foodLog.findUnique({
       where: {
@@ -40,6 +40,9 @@ export async function GET(req: NextRequest) {
         date: { gte: subDays(today, 7) },
       },
       include: { entries: true },
+    }),
+    prisma.waterLog.findUnique({
+      where: { userId_date: { userId: session.user.id, date: new Date(todayStr) } },
     }),
   ]);
 
@@ -172,5 +175,6 @@ export async function GET(req: NextRequest) {
       ...w,
       smoothed: Math.round(smoothedValues[i] * 10) / 10,
     })),
+    todayWaterMl: todayWater?.amount ?? 0,
   });
 }

@@ -16,14 +16,16 @@ import { WeightChart } from "@/components/dashboard/WeightChart";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { SuggestionBanner } from "@/components/dashboard/SuggestionBanner";
 import { WeightLogModal } from "@/components/dashboard/WeightLogModal";
+import { WaterTracker } from "@/components/dashboard/WaterTracker";
 import { useDashboard } from "@/store/useDashboard";
 import { formatDate, getGoalLabel } from "@/lib/utils";
-import { calculateTimeline } from "@/lib/calculations";
+import { calculateTimeline, calculateWaterGoal } from "@/lib/calculations";
 
 export default function DashboardPage() {
   const { status } = useSession();
   const router = useRouter();
   const { data, loading, fetch } = useDashboard();
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -33,7 +35,13 @@ export default function DashboardPage() {
   if (status === "loading" || loading) return <AppLayout><DashboardSkeleton /></AppLayout>;
   if (!data) return null;
 
-  const { todayMacros, profile, weeklyStats, streak, adherenceScore, suggestions, recentWeights } = data;
+  const { todayMacros, profile, weeklyStats, streak, adherenceScore, suggestions, recentWeights, todayWaterMl } = data;
+
+  const waterGoalMl = profile?.waterGoal
+    ?? (profile?.currentWeight && profile?.gender && profile?.activityLevel && profile?.goal
+      ? calculateWaterGoal(profile.currentWeight, profile.gender, profile.activityLevel, profile.goal)
+      : 2500);
+  const isAutoWaterGoal = !profile?.waterGoal;
 
   const calorieTarget = profile?.adaptiveCalories ?? profile?.calorieTarget ?? 2000;
   const proteinTarget = profile?.proteinTarget ?? 150;
@@ -204,6 +212,16 @@ export default function DashboardPage() {
               icon={<Target size={16} />}
             />
           )}
+        </div>
+
+        {/* Water tracker */}
+        <div className="card">
+          <WaterTracker
+            initialMl={todayWaterMl}
+            goalMl={waterGoalMl}
+            date={todayStr}
+            isAutoGoal={isAutoWaterGoal}
+          />
         </div>
 
         {/* Weight trend chart */}

@@ -199,6 +199,31 @@ export function projectWeight(
   }));
 }
 
+// Returns recommended daily water intake in ml.
+// Based on body weight × activity multiplier, adjusted for gender and goal.
+export function calculateWaterGoal(
+  weightLbs: number,
+  gender: string,
+  activityLevel: string,
+  goal: string
+): number {
+  const activityOzPerLb: Record<string, number> = {
+    sedentary:   0.50,
+    light:       0.54,
+    moderate:    0.59,
+    active:      0.63,
+    very_active: 0.67,
+  };
+
+  let oz = weightLbs * (activityOzPerLb[activityLevel] ?? 0.55);
+
+  if (gender === "male") oz *= 1.05;
+  if (goal === "moderate_loss" || goal === "aggressive_loss") oz *= 1.10;
+
+  const ml = Math.round((oz * 29.5735) / 50) * 50;
+  return Math.max(1500, Math.min(5000, ml));
+}
+
 export function lbsToKg(lbs: number): number {
   return Math.round(lbs * 0.453592 * 10) / 10;
 }

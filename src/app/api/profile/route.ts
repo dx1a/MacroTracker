@@ -22,6 +22,7 @@ const profileSchema = z.object({
   goal: z
     .enum(["maintain", "lean_bulk", "mild_loss", "moderate_loss", "aggressive_loss"])
     .optional(),
+  waterGoal: z.number().int().min(500).max(10000).nullable().optional(),
 });
 
 export async function GET() {

@@ -14,13 +14,14 @@ interface DashboardPayload {
   profile: {
     calorieTarget?: number; proteinTarget?: number; carbTarget?: number; fatTarget?: number;
     adaptiveCalories?: number; goal?: string; currentWeight?: number; goalWeight?: number;
-    tdee?: number;
+    tdee?: number; gender?: string; activityLevel?: string; waterGoal?: number;
   } | null;
   weeklyStats: { avgCalories: number; avgProtein: number; avgCarbs: number; avgFat: number; totalDays: number; daysLogged: number };
   streak: { current: number; longest: number };
   adherenceScore: number;
   suggestions: string[];
   recentWeights: { id: string; date: string; weight: number; smoothed: number }[];
+  todayWaterMl: number;
 }
 
 export const useDashboard = create<DashboardState>((set, get) => ({

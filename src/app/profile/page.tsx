@@ -11,6 +11,7 @@ import {
   calculateCalorieTarget,
   calculateMacroTargets,
   calculateTimeline,
+  calculateWaterGoal,
 } from "@/lib/calculations";
 import { getGoalLabel, getActivityLabel, formatDate } from "@/lib/utils";
 import { useDashboard } from "@/store/useDashboard";
@@ -28,6 +29,7 @@ interface FormState {
   goalWeight: string;
   activityLevel: Activity;
   goal: Goal;
+  waterGoalOz: string; // empty = auto
 }
 
 const GOALS: { value: Goal; label: string; desc: string; color: string }[] = [
@@ -57,6 +59,7 @@ export default function ProfilePage() {
     currentWeight: "", goalWeight: "",
     activityLevel: "moderate",
     goal: "moderate_loss",
+    waterGoalOz: "",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -84,6 +87,7 @@ export default function ProfilePage() {
           goalWeight: p.goalWeight ? String(p.goalWeight) : "",
           activityLevel: (p.activityLevel as Activity) ?? "moderate",
           goal: (p.goal as Goal) ?? "moderate_loss",
+          waterGoalOz: p.waterGoal ? String(Math.round(p.waterGoal / 29.5735)) : "",
         });
         setLoading(false);
       });
@@ -138,6 +142,8 @@ export default function ProfilePage() {
     if (heightCm > 0) body.heightCm = heightCm;
     if (weight > 0) body.currentWeight = weight;
     if (gw > 0) body.goalWeight = gw;
+    const waterOz = parseFloat(form.waterGoalOz);
+    body.waterGoal = waterOz > 0 ? Math.round(waterOz * 29.5735) : null;
 
     try {
       const res = await fetch("/api/profile", {
@@ -232,6 +238,46 @@ export default function ProfilePage() {
               <label className="label">Goal Weight (lbs)</label>
               <input className="input" type="number" step="0.1" value={form.goalWeight} onChange={(e) => setField("goalWeight", e.target.value)} placeholder="155" />
             </div>
+          </div>
+        </div>
+
+        {/* Water goal */}
+        <div className="card">
+          <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "0.25rem" }}>Daily Water Goal</h3>
+          <p style={{ fontSize: "0.78rem", color: "var(--color-muted)", marginBottom: "1rem" }}>
+            Leave blank to auto-calculate from your weight, gender, and activity level
+            {hasEnough && !form.waterGoalOz && (
+              <span style={{ color: "var(--color-primary-light)", fontWeight: 600 }}>
+                {" · "}Auto: {Math.round(calculateWaterGoal(weight, form.gender, form.activityLevel, form.goal) / 29.5735)} oz / day
+              </span>
+            )}
+          </p>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <div style={{ position: "relative", maxWidth: "160px" }}>
+              <input
+                className="input"
+                type="number"
+                min="32"
+                max="300"
+                step="1"
+                value={form.waterGoalOz}
+                onChange={(e) => setField("waterGoalOz", e.target.value)}
+                placeholder="Auto"
+              />
+              <span style={{ position: "absolute", right: "0.6rem", top: "50%", transform: "translateY(-50%)", fontSize: "0.75rem", color: "var(--color-muted)" }}>
+                oz
+              </span>
+            </div>
+            {form.waterGoalOz && (
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={() => setField("waterGoalOz", "")}
+                style={{ fontSize: "0.78rem", padding: "0.5rem 0.75rem" }}
+              >
+                Reset to auto
+              </button>
+            )}
           </div>
         </div>
 
