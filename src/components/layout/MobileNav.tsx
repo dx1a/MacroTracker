@@ -24,7 +24,8 @@ export function MobileNav() {
         backgroundColor: "var(--color-surface)",
         borderTop: "1px solid var(--color-border)",
         display: "flex",
-        padding: "0.5rem",
+        padding: "0.375rem 0.25rem",
+        paddingBottom: "calc(0.375rem + env(safe-area-inset-bottom, 0px))",
         zIndex: 50,
       }}
     >
@@ -39,16 +40,18 @@ export function MobileNav() {
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: "0.25rem",
-              padding: "0.5rem",
-              borderRadius: "0.5rem",
+              gap: "0.2rem",
+              padding: "0.5rem 0.25rem",
+              borderRadius: "0.625rem",
               color: active ? "var(--color-primary-light)" : "var(--color-muted)",
+              backgroundColor: active ? "color-mix(in srgb, var(--color-primary) 10%, transparent)" : "transparent",
               textDecoration: "none",
-              fontSize: "0.65rem",
+              fontSize: "0.68rem",
               fontWeight: active ? 600 : 500,
+              transition: "all 0.15s",
             }}
           >
-            <Icon size={20} />
+            <Icon size={22} />
             {label}
           </Link>
         );

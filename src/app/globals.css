@@ -49,6 +49,37 @@
   --color-danger: #dc2626;
 }
 
+/* ── Responsive layout helpers ── */
+.layout-main-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.layout-weekly-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 767px) {
+  .layout-main-grid {
+    grid-template-columns: 1fr;
+  }
+  .layout-weekly-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  /* Extra breathing room so content clears the fixed mobile nav */
+  .mobile-bottom-safe {
+    padding-bottom: 5rem;
+  }
+  /* Shrink large chart heights on small screens */
+  .chart-container-tall {
+    height: 180px !important;
+  }
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -159,6 +190,23 @@
 
   .input::placeholder {
     color: var(--color-muted);
+  }
+
+  /* Date input used in log page date picker */
+  .date-input {
+    background: transparent;
+    border: none;
+    color: var(--color-foreground);
+    font-size: 0.875rem;
+    font-weight: 700;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    outline: none;
+    text-align: center;
+    padding: 0;
+  }
+  .date-input::-webkit-calendar-picker-indicator {
+    display: none;
   }
 
   .label {

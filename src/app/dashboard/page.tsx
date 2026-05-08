@@ -108,7 +108,7 @@ export default function DashboardPage() {
         )}
 
         {/* Main calorie + macro row */}
-        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "1.5rem", alignItems: "center" }}>
+        <div className="layout-main-grid">
           {/* Calorie ring */}
           <div className="card" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", padding: "1.75rem" }}>
             <MacroRing calories={todayMacros.calories} target={calorieTarget} size={190} />
@@ -161,7 +161,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Stat cards row */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "1rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "1rem" }}>
           <StatCard
             label="Today's Deficit"
             value={deficit > 0 ? `−${Math.round(deficit)}` : `+${Math.round(Math.abs(deficit))}`}
@@ -230,7 +230,7 @@ export default function DashboardPage() {
         {/* Weekly macro breakdown */}
         <div className="card">
           <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "1.25rem" }}>Weekly Average Macros</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem" }}>
+          <div className="layout-weekly-grid">
             {[
               { label: "Calories", value: weeklyStats.avgCalories, unit: "kcal", color: "var(--color-calories)" },
               { label: "Protein", value: weeklyStats.avgProtein, unit: "g", color: "var(--color-protein)" },

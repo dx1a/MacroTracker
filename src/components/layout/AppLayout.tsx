@@ -19,7 +19,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <ThemeToggle iconOnly />
         </div>
 
-        <div style={{ flex: 1, padding: "1.5rem", maxWidth: "1400px", width: "100%", margin: "0 auto" }}>
+        <div className="mobile-bottom-safe" style={{ flex: 1, padding: "1.5rem", maxWidth: "1400px", width: "100%", margin: "0 auto" }}>
           {children}
         </div>
 

@@ -126,9 +126,25 @@ export default function LogPage() {
             <button className="btn-ghost" onClick={() => setDate((d) => offsetDate(d, -1))} style={{ padding: "0.5rem" }}>
               <ChevronLeft size={16} />
             </button>
-            <span style={{ fontSize: "0.875rem", fontWeight: 700, minWidth: "80px", textAlign: "center" }}>
-              {displayDate(date)}
-            </span>
+
+            {/* Clicking the date label opens the native date picker */}
+            <div style={{ position: "relative", minWidth: "90px", textAlign: "center" }}>
+              <span style={{ fontSize: "0.875rem", fontWeight: 700, pointerEvents: "none", whiteSpace: "nowrap" }}>
+                {displayDate(date)}
+              </span>
+              <input
+                type="date"
+                className="date-input"
+                value={date}
+                max={todayStr()}
+                onChange={(e) => e.target.value && setDate(e.target.value)}
+                style={{
+                  position: "absolute", inset: 0, opacity: 0, cursor: "pointer", width: "100%",
+                }}
+                title="Jump to a date"
+              />
+            </div>
+
             <button
               className="btn-ghost"
               onClick={() => setDate((d) => offsetDate(d, 1))}
@@ -213,17 +229,17 @@ export default function LogPage() {
             const total = mealTotal(key);
             return (
               <div key={key} className="card">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: mealItems.length > 0 ? "1rem" : "0" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: mealItems.length > 0 ? "1rem" : "0", gap: "0.5rem", flexWrap: "wrap" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <span style={{ fontSize: "1.1rem" }}>{emoji}</span>
                     <h3 style={{ fontSize: "1rem", fontWeight: 700 }}>{label}</h3>
                     {mealItems.length > 0 && (
-                      <span style={{ fontSize: "0.75rem", color: "var(--color-muted)" }}>
-                        ({mealItems.length} {mealItems.length === 1 ? "item" : "items"})
+                      <span style={{ fontSize: "0.72rem", color: "var(--color-muted)" }}>
+                        {mealItems.length} {mealItems.length === 1 ? "item" : "items"}
                       </span>
                     )}
                   </div>
-                  <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+                  <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
                     {total > 0 && (
                       <span style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--color-calories)" }}>
                         {Math.round(total)} kcal
