@@ -48,12 +48,16 @@ export async function POST(req: NextRequest) {
       create: { userId: session.user.id, weight, date: new Date(date), note },
     });
 
-    // Update profile current weight
-    await prisma.profile.upsert({
-      where: { userId: session.user.id },
-      update: { currentWeight: weight },
-      create: { userId: session.user.id, currentWeight: weight },
-    });
+    // Only update profile currentWeight when logging today's weight.
+    // Backfilling a past date should not overwrite the most recent known weight.
+    const today = new Date().toISOString().slice(0, 10);
+    if (date === today) {
+      await prisma.profile.upsert({
+        where: { userId: session.user.id },
+        update: { currentWeight: weight },
+        create: { userId: session.user.id, currentWeight: weight },
+      });
+    }
 
     return NextResponse.json(entry, { status: 201 });
   } catch (err) {
