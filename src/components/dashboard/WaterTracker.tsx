@@ -41,7 +41,7 @@ export function WaterTracker({ initialMl, goalMl, date, isAutoGoal }: WaterTrack
     save(next);
   }
 
-  const fillY = 134 * (1 - pct);
+  const fillY = 132 * (1 - pct);
   const isGoalMet = pct >= 1;
 
   return (
@@ -64,7 +64,7 @@ export function WaterTracker({ initialMl, goalMl, date, isAutoGoal }: WaterTrack
       <div style={{ display: "flex", alignItems: "center", gap: "2rem", flexWrap: "wrap" }}>
         {/* Glass SVG */}
         <div style={{ flexShrink: 0, margin: "0 auto" }}>
-          <svg viewBox="0 0 80 135" width="90" height="152" style={{ overflow: "visible", display: "block" }}>
+          <svg viewBox="0 0 80 135" width="90" height="152" style={{ overflow: "hidden", display: "block" }}>
             <defs>
               <linearGradient id="waterFill" x1="0" y1="1" x2="0" y2="0">
                 <stop offset="0%" stopColor="#1d4ed8" />
@@ -75,26 +75,29 @@ export function WaterTracker({ initialMl, goalMl, date, isAutoGoal }: WaterTrack
                 <stop offset="100%" stopColor="#34d399" />
               </linearGradient>
               <clipPath id="glassClip">
-                {/* Slightly tapered glass shape */}
                 <path d="M8,0 L72,0 L65,132 L15,132 Z" />
               </clipPath>
             </defs>
 
-            {/* Glass background */}
-            <path d="M8,0 L72,0 L65,132 L15,132 Z" fill="var(--color-surface)" clipPath="url(#glassClip)" />
+            {/* Clip group — everything inside is masked to the glass shape.
+                The water rect is transformed inside this group so the clip
+                always cuts off the fill at the glass boundary. */}
+            <g clipPath="url(#glassClip)">
+              {/* Glass interior background */}
+              <rect x="0" y="0" width="80" height="132" fill="var(--color-surface)" />
 
-            {/* Water fill — translateY animates up as amount increases */}
-            <rect
-              x="0" y="0" width="80" height="132"
-              fill={isGoalMet ? "url(#waterFillGreen)" : "url(#waterFill)"}
-              clipPath="url(#glassClip)"
-              style={{
-                transform: `translateY(${fillY}px)`,
-                transition: saving ? "none" : "transform 0.6s cubic-bezier(0.4,0,0.2,1)",
-              }}
-            />
+              {/* Water fill — translateY slides it down (less water = more offset) */}
+              <rect
+                x="0" y="0" width="80" height="132"
+                fill={isGoalMet ? "url(#waterFillGreen)" : "url(#waterFill)"}
+                style={{
+                  transform: `translateY(${fillY}px)`,
+                  transition: saving ? "none" : "transform 0.6s cubic-bezier(0.4,0,0.2,1)",
+                }}
+              />
+            </g>
 
-            {/* Measurement lines */}
+            {/* Measurement lines — drawn on top of fill, inside glass */}
             {[0.25, 0.5, 0.75].map((mark) => {
               const yMark = 132 * (1 - mark);
               return (
