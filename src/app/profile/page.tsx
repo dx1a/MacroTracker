@@ -61,6 +61,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -126,24 +127,40 @@ export default function ProfilePage() {
 
   async function handleSave() {
     setSaving(true);
-    const body = {
-      age: age || undefined,
+    setSaveError("");
+
+    const body: Record<string, unknown> = {
       gender: form.gender,
-      heightCm: heightCm || undefined,
-      currentWeight: weight || undefined,
-      goalWeight: gw || undefined,
       activityLevel: form.activityLevel,
       goal: form.goal,
     };
-    await fetch("/api/profile", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    setSaving(false);
-    setSaved(true);
-    refetchDashboard();
-    setTimeout(() => setSaved(false), 3000);
+    if (age > 0) body.age = age;
+    if (heightCm > 0) body.heightCm = heightCm;
+    if (weight > 0) body.currentWeight = weight;
+    if (gw > 0) body.goalWeight = gw;
+
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        setSaveError(typeof err.error === "string" ? err.error : "Failed to save. Please check your inputs.");
+        setSaving(false);
+        return;
+      }
+
+      setSaving(false);
+      setSaved(true);
+      refetchDashboard();
+      setTimeout(() => setSaved(false), 3000);
+    } catch {
+      setSaveError("Network error — please try again.");
+      setSaving(false);
+    }
   }
 
   if (loading) {
@@ -334,6 +351,17 @@ export default function ProfilePage() {
           <div className="card" style={{ textAlign: "center", padding: "2rem", color: "var(--color-muted)" }}>
             <Info size={24} style={{ margin: "0 auto 0.75rem", opacity: 0.4 }} />
             <p style={{ fontSize: "0.875rem" }}>Fill in your age, height, and weight to see your personalised targets.</p>
+          </div>
+        )}
+
+        {saveError && (
+          <div style={{
+            padding: "0.875rem 1rem", borderRadius: "0.75rem",
+            backgroundColor: "color-mix(in srgb, var(--color-danger) 12%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--color-danger) 30%, transparent)",
+            color: "#fca5a5", fontSize: "0.875rem",
+          }}>
+            ⚠️ {saveError}
           </div>
         )}
 

@@ -11,11 +11,11 @@ import {
 import { z } from "zod";
 
 const profileSchema = z.object({
-  age: z.number().int().min(10).max(120).optional(),
+  age: z.number().min(10).max(120).optional(),
   gender: z.enum(["male", "female", "other"]).optional(),
   heightCm: z.number().min(50).max(300).optional(),
-  currentWeight: z.number().min(20).max(500).optional(),
-  goalWeight: z.number().min(20).max(500).optional(),
+  currentWeight: z.number().min(20).max(700).optional(),
+  goalWeight: z.number().min(20).max(700).optional(),
   activityLevel: z
     .enum(["sedentary", "light", "moderate", "active", "very_active"])
     .optional(),
