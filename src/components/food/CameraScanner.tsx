@@ -142,7 +142,17 @@ function parseNutritionText(raw: string): ScanResult | null {
   ]);
 
   if (matched === 0) return null;
-  return { calories, protein, carbs, fat };
+
+  // Truncate macros to 1 decimal place — fixes OCR misreading trailing 'g' as '9'
+  // e.g. "9.4g" → OCR outputs "9.49" → truncated back to 9.4
+  const t1 = (v: number) => Math.trunc(v * 10) / 10;
+
+  return {
+    calories: Math.round(calories),
+    protein:  t1(protein),
+    carbs:    t1(carbs),
+    fat:      t1(fat),
+  };
 }
 
 // ── Component ────────────────────────────────────────────────────────────────

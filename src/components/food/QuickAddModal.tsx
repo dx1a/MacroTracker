@@ -28,6 +28,7 @@ export function QuickAddModal({ meal, date, onClose, onAdded }: QuickAddModalPro
   const [protein, setProtein] = useState("");
   const [carbs, setCarbs] = useState("");
   const [fat, setFat] = useState("");
+  const [servings, setServings] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showScanner, setShowScanner] = useState(false);
@@ -48,6 +49,11 @@ export function QuickAddModal({ meal, date, onClose, onAdded }: QuickAddModalPro
     setProtein(result.protein > 0 ? String(result.protein) : "");
     setCarbs(result.carbs > 0 ? String(result.carbs) : "");
     setFat(result.fat > 0 ? String(result.fat) : "");
+    setServings(1);
+  }
+
+  function adjustServings(delta: number) {
+    setServings((s) => Math.max(0.5, Math.round((s + delta) * 10) / 10));
   }
 
   async function handleAdd() {
@@ -55,7 +61,14 @@ export function QuickAddModal({ meal, date, onClose, onAdded }: QuickAddModalPro
     setError("");
     setLoading(true);
 
-    optimisticAddCalories(cal, pro, carb, f);
+    const totalCal  = Math.round(cal  * servings);
+    const totalPro  = Math.round(pro  * servings * 10) / 10;
+    const totalCarb = Math.round(carb * servings * 10) / 10;
+    const totalFat  = Math.round(f    * servings * 10) / 10;
+
+    optimisticAddCalories(totalCal, totalPro, totalCarb, totalFat);
+
+    const name = [label.trim() || "Quick Add", servings !== 1 ? `×${servings}` : ""].filter(Boolean).join(" ");
 
     const res = await fetch("/api/logs/quick", {
       method: "POST",
@@ -63,11 +76,11 @@ export function QuickAddModal({ meal, date, onClose, onAdded }: QuickAddModalPro
       body: JSON.stringify({
         date,
         meal: selectedMeal,
-        name: label.trim() || "Quick Add",
-        calories: cal,
-        protein: pro,
-        carbs: carb,
-        fat: f,
+        name,
+        calories: totalCal,
+        protein:  totalPro,
+        carbs:    totalCarb,
+        fat:      totalFat,
       }),
     });
 
@@ -182,6 +195,56 @@ export function QuickAddModal({ meal, date, onClose, onAdded }: QuickAddModalPro
                   ? `⚠ Macros add up to ~${Math.round(macroCals)} kcal — double-check your numbers`
                   : `✓ Macros add up to ~${Math.round(macroCals)} kcal`}
               </div>
+            )}
+          </div>
+
+          {/* Servings */}
+          <div style={{ marginBottom: "1rem" }}>
+            <label className="label">Servings</label>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <button
+                onClick={() => adjustServings(-0.5)}
+                style={{
+                  width: 36, height: 36, borderRadius: "0.5rem",
+                  border: "1px solid var(--color-border)",
+                  background: "var(--color-surface)",
+                  color: "var(--color-foreground)",
+                  fontSize: "1.1rem", fontWeight: 700,
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >−</button>
+              <input
+                className="input"
+                type="number"
+                min="0.5"
+                step="0.5"
+                value={servings}
+                onChange={(e) => setServings(Math.max(0.5, parseFloat(e.target.value) || 1))}
+                style={{ textAlign: "center", flex: 1 }}
+              />
+              <button
+                onClick={() => adjustServings(0.5)}
+                style={{
+                  width: 36, height: 36, borderRadius: "0.5rem",
+                  border: "1px solid var(--color-border)",
+                  background: "var(--color-surface)",
+                  color: "var(--color-foreground)",
+                  fontSize: "1.1rem", fontWeight: 700,
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >+</button>
+            </div>
+            {servings !== 1 && cal > 0 && (
+              <p style={{ fontSize: "0.75rem", color: "var(--color-muted)", marginTop: "0.375rem" }}>
+                Total: <strong style={{ color: "var(--color-foreground)" }}>
+                  {Math.round(cal * servings)} kcal
+                  {pro  > 0 ? ` · ${Math.round(pro  * servings * 10) / 10}g protein` : ""}
+                  {carb > 0 ? ` · ${Math.round(carb * servings * 10) / 10}g carbs`   : ""}
+                  {f    > 0 ? ` · ${Math.round(f    * servings * 10) / 10}g fat`     : ""}
+                </strong>
+              </p>
             )}
           </div>
 
