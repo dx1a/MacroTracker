@@ -48,8 +48,9 @@ export default function DashboardPage() {
   const proteinTarget = profile?.proteinTarget ?? 150;
   const carbTarget = profile?.carbTarget ?? 200;
   const fatTarget = profile?.fatTarget ?? 65;
-  const deficit = calorieTarget - todayMacros.calories;
-  const weeklyAvgDeficit = calorieTarget - weeklyStats.avgCalories;
+  const tdee = profile?.tdee ?? calorieTarget;
+  const deficit = tdee - todayMacros.calories;
+  const weeklyAvgDeficit = tdee - weeklyStats.avgCalories;
 
   const weeksToGoal = profile?.currentWeight && profile?.goalWeight && profile?.goal
     ? calculateTimeline(profile.currentWeight, profile.goalWeight, profile.goal as "maintain" | "lean_bulk" | "mild_loss" | "moderate_loss" | "aggressive_loss")

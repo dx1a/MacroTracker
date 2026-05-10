@@ -35,6 +35,7 @@ export async function GET(req: NextRequest) {
 
   const calorieTarget =
     profile?.adaptiveCalories ?? profile?.calorieTarget ?? 2000;
+  const tdee = profile?.tdee ?? calorieTarget;
 
   // Weight history with smoothing
   const weightValues = weightLogs.map((w) => w.weight);
@@ -67,7 +68,7 @@ export async function GET(req: NextRequest) {
     const consumed = log.entries.reduce((s, e) => s + e.calories, 0);
     return {
       date: format(new Date(log.date), "MMM d"),
-      deficit: Math.round(calorieTarget - consumed),
+      deficit: Math.round(tdee - consumed),
     };
   });
 
