@@ -22,7 +22,7 @@ const nav = [
   { href: "/profile", label: "Profile", icon: User },
 ];
 
-export function Sidebar() {
+export function Sidebar({ onClose }: { onClose?: () => void } = {}) {
   const pathname = usePathname();
 
   return (
@@ -36,6 +36,7 @@ export function Sidebar() {
         flexDirection: "column",
         padding: "1.5rem 1rem",
         gap: "0.5rem",
+        height: "100%",
       }}
     >
       {/* Logo */}
@@ -60,6 +61,7 @@ export function Sidebar() {
             <Link
               key={href}
               href={href}
+              onClick={onClose}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -85,7 +87,7 @@ export function Sidebar() {
 
       {/* Sign out */}
       <button
-        onClick={() => signOut({ callbackUrl: "/login" })}
+        onClick={() => { signOut({ callbackUrl: "/login" }); onClose?.(); }}
         style={{
           display: "flex",
           alignItems: "center",
