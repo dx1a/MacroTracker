@@ -17,26 +17,7 @@ interface ReviewData {
   annotatedImage: string;
 }
 
-// ── Image preprocessing ──────────────────────────────────────────────────────
-
-function preprocessForOcr(src: HTMLCanvasElement): HTMLCanvasElement {
-  const dst = document.createElement("canvas");
-  dst.width = src.width;
-  dst.height = src.height;
-  const ctx = dst.getContext("2d")!;
-  ctx.drawImage(src, 0, 0);
-  const img = ctx.getImageData(0, 0, dst.width, dst.height);
-  const d = img.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-    const boosted = Math.min(255, Math.max(0, (gray - 128) * 1.6 + 128));
-    d[i] = d[i + 1] = d[i + 2] = boosted;
-  }
-  ctx.putImageData(img, 0, 0);
-  return dst;
-}
-
-// ── Box drawing ──────────────────────────────────────────────────────────────
+// ── Constants ────────────────────────────────────────────────────────────────
 
 const NUTRITION_KEYWORDS = [
   "calorie", "protein", "carbohydrate", "carb", "fat", "energy", "kcal",
@@ -44,41 +25,72 @@ const NUTRITION_KEYWORDS = [
 ];
 const HEADER_KEYWORDS = ["nutrition facts", "nutrition information", "supplement facts"];
 
-function drawBoxes(
-  canvas: HTMLCanvasElement,
-  lines: Array<{ text: string; confidence: number; bbox: { x0: number; y0: number; x1: number; y1: number } }>
-): void {
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
+function applyPreprocess(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    const v = Math.min(255, Math.max(0, (gray - 128) * 1.6 + 128));
+    d[i] = d[i + 1] = d[i + 2] = v;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+function preprocessForOcr(src: HTMLCanvasElement): HTMLCanvasElement {
+  const dst = document.createElement("canvas");
+  dst.width = src.width;
+  dst.height = src.height;
+  const ctx = dst.getContext("2d")!;
+  ctx.drawImage(src, 0, 0);
+  applyPreprocess(ctx, dst.width, dst.height);
+  return dst;
+}
+
+type OcrLine = {
+  text: string;
+  confidence: number;
+  bbox: { x0: number; y0: number; x1: number; y1: number };
+};
+
+function drawOcrBoxes(
+  octx: CanvasRenderingContext2D,
+  lines: OcrLine[],
+  scaleX: number,
+  scaleY: number,
+  alpha = 1,
+) {
   for (const line of lines) {
-    if (line.confidence < 20 || !line.text.trim()) continue;
+    if (line.confidence < 25 || !line.text.trim()) continue;
     const { x0, y0, x1, y1 } = line.bbox;
-    const w = x1 - x0;
-    const h = y1 - y0;
-    if (w < 4 || h < 4) continue;
+    const bx = x0 * scaleX;
+    const by = y0 * scaleY;
+    const bw = (x1 - x0) * scaleX;
+    const bh = (y1 - y0) * scaleY;
+    if (bw < 4 || bh < 4) continue;
 
     const text = line.text.toLowerCase();
     const isHeader = HEADER_KEYWORDS.some((k) => text.includes(k));
     const isNutrition = NUTRITION_KEYWORDS.some((k) => text.includes(k));
 
-    ctx.lineWidth = isHeader || isNutrition ? 2.5 : 1;
+    octx.globalAlpha = alpha;
+    octx.lineWidth = isHeader || isNutrition ? 2 : 1;
 
     if (isHeader) {
-      ctx.fillStyle = "rgba(167,139,250,0.18)";
-      ctx.fillRect(x0, y0, w, h);
-      ctx.strokeStyle = "#a78bfa";
-      ctx.strokeRect(x0, y0, w, h);
+      octx.fillStyle = "rgba(167,139,250,0.18)";
+      octx.fillRect(bx, by, bw, bh);
+      octx.strokeStyle = "#a78bfa";
     } else if (isNutrition) {
-      ctx.fillStyle = "rgba(16,217,160,0.12)";
-      ctx.fillRect(x0, y0, w, h);
-      ctx.strokeStyle = "#10d9a0";
-      ctx.strokeRect(x0, y0, w, h);
+      octx.fillStyle = "rgba(16,217,160,0.12)";
+      octx.fillRect(bx, by, bw, bh);
+      octx.strokeStyle = "#10d9a0";
     } else {
-      ctx.strokeStyle = "rgba(255,255,255,0.28)";
-      ctx.strokeRect(x0, y0, w, h);
+      octx.strokeStyle = "rgba(255,255,255,0.22)";
     }
+    octx.strokeRect(bx, by, bw, bh);
   }
+  octx.globalAlpha = 1;
 }
 
 // ── Text parsing ─────────────────────────────────────────────────────────────
@@ -129,7 +141,6 @@ function parseNutritionText(raw: string): ScanResult | null {
     /\bfat\s*\n\s*(\d+(?:\.\d+)?)/,
   ]);
 
-  // Return null only if no pattern matched at all (OCR found no nutrition text)
   if (matched === 0) return null;
   return { calories, protein, carbs, fat };
 }
@@ -144,17 +155,76 @@ interface CameraScannerProps {
 type Phase = "camera" | "processing" | "review" | "error";
 
 export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const workerRef = useRef<Worker | null>(null);
-  const workerReadyRef = useRef(false);
+  const videoRef      = useRef<HTMLVideoElement>(null);
+  const canvasRef     = useRef<HTMLCanvasElement>(null);
+  const overlayRef    = useRef<HTMLCanvasElement>(null);
+  const streamRef     = useRef<MediaStream | null>(null);
+  const workerRef     = useRef<Worker | null>(null);
+  const workerReadyRef  = useRef(false);
+  const liveActiveRef   = useRef(false);  // controls live scan loop
+  const liveBusyRef     = useRef(false);  // prevents concurrent OCR calls
 
   const [phase, setPhase] = useState<Phase>("camera");
   const [statusMsg, setStatusMsg] = useState("Loading scanner…");
   const [progress, setProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
   const [reviewData, setReviewData] = useState<ReviewData | null>(null);
+
+  // ── Live OCR loop ──────────────────────────────────────────────────────────
+
+  async function runLiveScan() {
+    const video  = videoRef.current;
+    const overlay = overlayRef.current;
+    const worker  = workerRef.current;
+    if (!video || !overlay || !worker || video.videoWidth === 0) return;
+
+    const dw = video.clientWidth  || window.innerWidth;
+    const dh = video.clientHeight || window.innerHeight;
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+
+    // Compute cover-crop: capture only the visible portion of the video
+    const coverScale = Math.max(dw / vw, dh / vh);
+    const srcW = dw / coverScale;
+    const srcH = dh / coverScale;
+    const srcX = (vw - srcW) / 2;
+    const srcY = (vh - srcH) / 2;
+
+    // Small target for fast OCR
+    const TW = 360;
+    const TH = Math.round(TW * (dh / dw));
+
+    const tmp = document.createElement("canvas");
+    tmp.width  = TW;
+    tmp.height = TH;
+    const tctx = tmp.getContext("2d")!;
+    tctx.drawImage(video, srcX, srcY, srcW, srcH, 0, 0, TW, TH);
+    applyPreprocess(tctx, TW, TH);
+
+    const { data } = await worker.recognize(tmp);
+
+    if (!liveActiveRef.current) return; // stopped while we were scanning
+
+    // Resize overlay canvas to display dimensions if needed
+    if (overlay.width !== dw || overlay.height !== dh) {
+      overlay.width  = dw;
+      overlay.height = dh;
+    }
+
+    const octx = overlay.getContext("2d")!;
+    octx.clearRect(0, 0, dw, dh);
+    drawOcrBoxes(octx, data.lines as OcrLine[], dw / TW, dh / TH, 0.85);
+  }
+
+  async function liveScanLoop() {
+    if (!liveActiveRef.current || liveBusyRef.current) return;
+    liveBusyRef.current = true;
+    try { await runLiveScan(); } catch { /* ignore */ }
+    liveBusyRef.current = false;
+    if (liveActiveRef.current) setTimeout(liveScanLoop, 400);
+  }
+
+  // ── Camera + worker init ───────────────────────────────────────────────────
 
   useEffect(() => {
     let active = true;
@@ -200,34 +270,41 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
         workerRef.current = worker;
         workerReadyRef.current = true;
         setStatusMsg("Ready");
+        // Kick off live scanning now that the worker is ready
+        liveActiveRef.current = true;
+        liveScanLoop();
       })
       .catch(() => {});
 
     return () => {
       active = false;
+      liveActiveRef.current = false;
       streamRef.current?.getTracks().forEach((t) => t.stop());
       workerRef.current?.terminate();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Capture ────────────────────────────────────────────────────────────────
+
   async function capture() {
-    const video = videoRef.current;
+    const video  = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || video.videoWidth === 0) return;
 
+    liveActiveRef.current = false; // stop live scan
+
     const maxDim = 1280;
     const scale = Math.min(maxDim / video.videoWidth, maxDim / video.videoHeight, 1);
-    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.width  = Math.round(video.videoWidth  * scale);
     canvas.height = Math.round(video.videoHeight * scale);
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const ctx = canvas.getContext("2d")!;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     streamRef.current?.getTracks().forEach((t) => t.stop());
     setPhase("processing");
 
-    // Keep the color image for annotation; send a preprocessed copy to Tesseract
     const ocrCanvas = preprocessForOcr(canvas);
 
     if (!workerReadyRef.current) {
@@ -249,23 +326,22 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
       setStatusMsg("Reading label…");
       const { data } = await workerRef.current.recognize(ocrCanvas);
 
-      // Draw detection boxes on the original color canvas
-      drawBoxes(canvas, data.lines as Parameters<typeof drawBoxes>[1]);
+      // Annotate the original color canvas with boxes
+      const octx = canvas.getContext("2d")!;
+      drawOcrBoxes(octx, data.lines as OcrLine[], 1, 1);
 
       const result = parseNutritionText(data.text);
 
+      const annotatedImage = canvas.toDataURL("image/jpeg", 0.92);
+
       if (!result) {
-        // Still show the annotated image so the user can see what was detected
-        setReviewData({ result: { calories: 0, protein: 0, carbs: 0, fat: 0 }, annotatedImage: canvas.toDataURL("image/jpeg", 0.92) });
+        setReviewData({ result: { calories: 0, protein: 0, carbs: 0, fat: 0 }, annotatedImage });
         setPhase("error");
         setErrorMsg("Nutrition values not found — see the highlighted boxes to check what was detected, then retake if needed.");
         return;
       }
 
-      setReviewData({
-        result,
-        annotatedImage: canvas.toDataURL("image/jpeg", 0.92),
-      });
+      setReviewData({ result, annotatedImage });
       setPhase("review");
     } catch {
       setPhase("error");
@@ -273,11 +349,10 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
     }
   }
 
+  // ── Actions ────────────────────────────────────────────────────────────────
+
   function confirm() {
-    if (reviewData) {
-      onFill(reviewData.result);
-      onClose();
-    }
+    if (reviewData) { onFill(reviewData.result); onClose(); }
   }
 
   function retry() {
@@ -295,6 +370,8 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
           videoRef.current.srcObject = stream;
           videoRef.current.play().catch(() => {});
         }
+        liveActiveRef.current = true;
+        liveScanLoop();
       })
       .catch(() => {
         setPhase("error");
@@ -303,6 +380,8 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
   }
 
   const r = reviewData?.result;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div style={{
@@ -319,10 +398,10 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
         background: "linear-gradient(to bottom, rgba(0,0,0,0.75), transparent)",
       }}>
         <span style={{ color: "white", fontWeight: 600, fontSize: "0.875rem" }}>
-          {phase === "camera" && "Fill the frame with the label"}
+          {phase === "camera"     && "Point at a nutrition label"}
           {phase === "processing" && statusMsg}
-          {phase === "review" && "Review detected values"}
-          {phase === "error" && "Scan failed"}
+          {phase === "review"     && "Review detected values"}
+          {phase === "error"      && "Scan failed"}
         </span>
         <button
           onClick={onClose}
@@ -337,7 +416,7 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
         </button>
       </div>
 
-      {/* Camera preview */}
+      {/* Camera phase */}
       {phase === "camera" && (
         <>
           <video
@@ -345,23 +424,34 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
             autoPlay playsInline muted
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
           />
+
+          {/* Live OCR overlay */}
+          <canvas
+            ref={overlayRef}
+            style={{
+              position: "absolute", inset: 0, zIndex: 5,
+              width: "100%", height: "100%",
+              pointerEvents: "none",
+            }}
+          />
+
           {/* Targeting reticle */}
           <div style={{
-            position: "absolute", inset: 0, zIndex: 5,
+            position: "absolute", inset: 0, zIndex: 6,
             display: "flex", alignItems: "center", justifyContent: "center",
             pointerEvents: "none",
           }}>
             <div style={{
               width: "78%", height: "52%",
-              border: "2px solid rgba(255,255,255,0.65)",
+              border: "2px solid rgba(255,255,255,0.6)",
               borderRadius: "0.75rem",
-              boxShadow: "0 0 0 9999px rgba(0,0,0,0.38)",
+              boxShadow: "0 0 0 9999px rgba(0,0,0,0.35)",
             }} />
           </div>
         </>
       )}
 
-      {/* Annotated image — shown in review and error phases */}
+      {/* Annotated still — review + error */}
       {(phase === "review" || phase === "error") && reviewData?.annotatedImage && (
         <img
           src={reviewData.annotatedImage}
@@ -375,8 +465,7 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
         <div style={{
           position: "absolute", inset: 0, zIndex: 6,
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-          gap: "1.25rem",
-          background: "rgba(0,0,0,0.6)",
+          gap: "1.25rem", background: "rgba(0,0,0,0.6)",
         }}>
           <div style={{
             width: 64, height: 64, borderRadius: "50%",
@@ -386,8 +475,7 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
           }}>
             <div style={{
               width: 40, height: 40, borderRadius: "50%",
-              border: "3px solid transparent",
-              borderTopColor: "#a78bfa",
+              border: "3px solid transparent", borderTopColor: "#a78bfa",
               animation: "cspin 0.9s linear infinite",
             }} />
           </div>
@@ -407,7 +495,7 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
         </div>
       )}
 
-      {/* Review bottom card */}
+      {/* Review card */}
       {phase === "review" && r && (
         <div style={{
           position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 10,
@@ -417,8 +505,7 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
           padding: "1.25rem 1.5rem",
           paddingBottom: "max(env(safe-area-inset-bottom), 1.25rem)",
         }}>
-          {/* Legend */}
-          <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem", fontSize: "0.7rem", color: "rgba(255,255,255,0.5)" }}>
+          <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem", fontSize: "0.7rem", color: "rgba(255,255,255,0.45)" }}>
             <span style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
               <span style={{ width: 10, height: 10, borderRadius: 2, background: "#10d9a0", display: "inline-block" }} />
               Nutrition rows
@@ -428,21 +515,20 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
               Label header
             </span>
             <span style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
-              <span style={{ width: 10, height: 10, borderRadius: 2, background: "rgba(255,255,255,0.28)", display: "inline-block" }} />
+              <span style={{ width: 10, height: 10, borderRadius: 2, background: "rgba(255,255,255,0.22)", display: "inline-block" }} />
               Other text
             </span>
           </div>
 
-          {/* Detected values */}
-          <p style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.625rem" }}>
+          <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.625rem" }}>
             Detected values
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.5rem", marginBottom: "1rem" }}>
             {[
               { label: "Calories", value: r.calories, color: "var(--color-calories)", unit: "" },
-              { label: "Protein", value: r.protein, color: "var(--color-protein)", unit: "g" },
-              { label: "Carbs", value: r.carbs, color: "var(--color-carbs)", unit: "g" },
-              { label: "Fat", value: r.fat, color: "var(--color-fat)", unit: "g" },
+              { label: "Protein",  value: r.protein,  color: "var(--color-protein)",  unit: "g" },
+              { label: "Carbs",    value: r.carbs,    color: "var(--color-carbs)",    unit: "g" },
+              { label: "Fat",      value: r.fat,      color: "var(--color-fat)",      unit: "g" },
             ].map(({ label, value, color, unit }) => (
               <div key={label} style={{
                 background: "rgba(255,255,255,0.06)", borderRadius: "0.625rem",
@@ -457,29 +543,22 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
             ))}
           </div>
 
-          {/* Actions */}
           <div style={{ display: "flex", gap: "0.625rem" }}>
             <button
               onClick={retry}
               className="btn-ghost"
               style={{ flex: 1, justifyContent: "center", color: "rgba(255,255,255,0.7)", borderColor: "rgba(255,255,255,0.15)" }}
             >
-              <RotateCcw size={15} />
-              Retake
+              <RotateCcw size={15} /> Retake
             </button>
-            <button
-              onClick={confirm}
-              className="btn-primary"
-              style={{ flex: 2, justifyContent: "center" }}
-            >
-              <Check size={15} />
-              Use These Values
+            <button onClick={confirm} className="btn-primary" style={{ flex: 2, justifyContent: "center" }}>
+              <Check size={15} /> Use These Values
             </button>
           </div>
         </div>
       )}
 
-      {/* Error state */}
+      {/* Error card */}
       {phase === "error" && (
         <div style={{
           position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 10,
@@ -494,18 +573,13 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
           <p style={{ color: "rgba(255,255,255,0.8)", textAlign: "center", fontSize: "0.85rem", lineHeight: 1.6 }}>
             {errorMsg}
           </p>
-          <button
-            className="btn-primary"
-            onClick={retry}
-            style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-          >
-            <RotateCcw size={15} />
-            Try Again
+          <button className="btn-primary" onClick={retry} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <RotateCcw size={15} /> Try Again
           </button>
         </div>
       )}
 
-      {/* Shutter button */}
+      {/* Shutter */}
       {phase === "camera" && (
         <div style={{
           position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 10,
@@ -523,8 +597,7 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
             aria-label="Capture nutrition label"
             style={{
               width: 80, height: 80, borderRadius: "50%",
-              background: "white",
-              border: "5px solid rgba(255,255,255,0.35)",
+              background: "white", border: "5px solid rgba(255,255,255,0.35)",
               cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center",
               boxShadow: "0 4px 24px rgba(0,0,0,0.5)",
