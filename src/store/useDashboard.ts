@@ -23,6 +23,7 @@ interface DashboardPayload {
   suggestions: string[];
   recentWeights: { id: string; date: string; weight: number; smoothed: number }[];
   todayWaterMl: number;
+  checkInDue: boolean;
 }
 
 export const useDashboard = create<DashboardState>((set, get) => ({

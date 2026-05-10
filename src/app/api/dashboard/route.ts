@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
     : format(new Date(), "yyyy-MM-dd");
   const today = new Date(todayStr + "T12:00:00Z"); // noon UTC avoids DST edge cases
 
-  const [profile, todayLog, weightLogs, last7DaysLogs, todayWater] = await Promise.all([
+  const [profile, todayLog, weightLogs, last7DaysLogs, todayWater, lastCheckIn, firstWeight] = await Promise.all([
     prisma.profile.findUnique({ where: { userId: session.user.id } }),
     prisma.foodLog.findUnique({
       where: {
@@ -48,6 +48,14 @@ export async function GET(req: NextRequest) {
     }),
     prisma.waterLog.findUnique({
       where: { userId_date: { userId: session.user.id, date: new Date(todayStr) } },
+    }),
+    prisma.weeklyCheckIn.findFirst({
+      where: { userId: session.user.id, recommendation: { not: "insufficient_data" } },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.weightLog.findFirst({
+      where: { userId: session.user.id },
+      orderBy: { date: "asc" },
     }),
   ]);
 
@@ -168,6 +176,15 @@ export async function GET(req: NextRequest) {
 
   const smoothedValues = smoothWeight(recentWeights.map((w) => w.weight));
 
+  // Check-in is due when user has 7+ days of weight data and 7+ days since last check-in
+  const daysSinceFirstWeight = firstWeight
+    ? Math.floor((Date.now() - new Date(firstWeight.date).getTime()) / 86_400_000)
+    : 0;
+  const daysSinceLastCheckIn = lastCheckIn
+    ? Math.floor((Date.now() - new Date(lastCheckIn.createdAt).getTime()) / 86_400_000)
+    : 999;
+  const checkInDue = daysSinceFirstWeight >= 7 && daysSinceLastCheckIn >= 7;
+
   return NextResponse.json({
     todayMacros,
     todayEntries: todayLog?.entries ?? [],
@@ -181,5 +198,6 @@ export async function GET(req: NextRequest) {
       smoothed: Math.round(smoothedValues[i] * 10) / 10,
     })),
     todayWaterMl: todayWater?.amount ?? 0,
+    checkInDue,
   });
 }

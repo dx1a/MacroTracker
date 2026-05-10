@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Flame, Target, TrendingDown, Trophy, Zap,
-  Plus, ArrowRight, Activity, Droplets,
+  Plus, ArrowRight, Activity, Droplets, ClipboardCheck,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { MacroRing } from "@/components/dashboard/MacroRing";
@@ -36,7 +36,7 @@ export default function DashboardPage() {
   if (status === "loading" || loading) return <AppLayout><DashboardSkeleton /></AppLayout>;
   if (!data) return null;
 
-  const { todayMacros, profile, weeklyStats, streak, adherenceScore, suggestions, recentWeights, todayWaterMl } = data;
+  const { todayMacros, profile, weeklyStats, streak, adherenceScore, suggestions, recentWeights, todayWaterMl, checkInDue } = data;
 
   const waterGoalMl = profile?.waterGoal
     ?? (profile?.currentWeight && profile?.gender && profile?.activityLevel && profile?.goal
@@ -92,6 +92,25 @@ export default function DashboardPage() {
             </Link>
           </div>
         </div>
+
+        {/* Weekly check-in prompt */}
+        {checkInDue && (
+          <Link href="/checkin" style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem",
+            padding: "1rem 1.25rem", borderRadius: "0.75rem", textDecoration: "none",
+            backgroundColor: "color-mix(in srgb, var(--color-primary) 10%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <ClipboardCheck size={18} color="var(--color-primary-light)" />
+              <div>
+                <p style={{ fontSize: "0.875rem", fontWeight: 700, color: "var(--color-primary-light)" }}>Weekly Check-In Ready</p>
+                <p style={{ fontSize: "0.78rem", color: "var(--color-muted)", marginTop: "0.1rem" }}>Review your weight trend and get a calorie adjustment suggestion</p>
+              </div>
+            </div>
+            <ArrowRight size={16} color="var(--color-primary-light)" style={{ flexShrink: 0 }} />
+          </Link>
+        )}
 
         {/* Smart Suggestions */}
         {suggestions.length > 0 && <SuggestionBanner suggestions={suggestions} />}

@@ -21,6 +21,7 @@ model User {
   customFoods   Food[]
   favoriteMeals FavoriteMeal[]
   waterLogs     WaterLog[]
+  weeklyCheckIns WeeklyCheckIn[]
 }
 
 model Profile {
@@ -153,4 +154,25 @@ model WaterLog {
 
   @@unique([userId, date])
   @@index([userId, date])
+}
+
+model WeeklyCheckIn {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  recommendation String   // cut | add | maintain | water_weight | refeed | insufficient_data
+  adjustment     Int      @default(0)   // kcal delta (positive = add, negative = cut)
+  reasoning      String   // short display label
+  weeklyChange   Float?   // actual lbs/week (negative = losing)
+  expectedChange Float    @default(0)   // expected lbs/week
+
+  status         String   @default("pending")  // pending | accepted | rejected
+  caloriesBefore Int?
+  caloriesAfter  Int?
+
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, createdAt])
 }

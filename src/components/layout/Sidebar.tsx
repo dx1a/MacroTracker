@@ -10,12 +10,14 @@ import {
   User,
   LogOut,
   Zap,
+  ClipboardCheck,
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 
 const nav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/log", label: "Food Log", icon: UtensilsCrossed },
+  { href: "/checkin", label: "Check-In", icon: ClipboardCheck },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/profile", label: "Profile", icon: User },
 ];
