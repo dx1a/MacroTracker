@@ -47,7 +47,8 @@ model Profile {
   lastAdaptiveCheck    DateTime?
   adaptiveAdjustments  Int      @default(0)
 
-  waterGoal      Int?      // ml per day; null = auto-calculated from stats
+  waterGoal         Int?      // ml per day; null = auto-calculated from stats
+  proteinPreference String?   // 'low' | 'moderate' | 'high' | 'athletic'
 
   updatedAt      DateTime @updatedAt
 }

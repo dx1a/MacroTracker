@@ -1,4 +1,5 @@
 export type Gender = "male" | "female" | "other";
+export type ProteinPreference = "low" | "moderate" | "high" | "athletic";
 export type ActivityLevel =
   | "sedentary"
   | "light"
@@ -57,16 +58,25 @@ export function calculateCalorieTarget(tdee: number, goal: Goal): number {
   return Math.max(1200, Math.round(target));
 }
 
+const PROTEIN_G_PER_LB: Record<ProteinPreference, number> = {
+  low:      0.6,
+  moderate: 0.8,
+  high:     1.0,
+  athletic: 1.2,
+};
+
 export function calculateMacroTargets(
   calories: number,
   weightKg: number,
-  goal: Goal
+  goal: Goal,
+  proteinPreference: ProteinPreference = "high",
+  goalWeightKg?: number,
 ) {
-  let proteinMultiplier = 2.2; // g per kg bodyweight
-  if (goal === "aggressive_loss") proteinMultiplier = 2.5;
-  if (goal === "lean_bulk") proteinMultiplier = 2.0;
+  // Use goal body weight for protein — avoids over-prescribing for people with more to lose
+  const targetKg = goalWeightKg ?? weightKg;
+  const targetLbs = targetKg / 0.453592;
+  const protein = Math.round(targetLbs * PROTEIN_G_PER_LB[proteinPreference]);
 
-  const protein = Math.round(weightKg * proteinMultiplier);
   const fat = Math.round((calories * 0.25) / 9);
   const remainingCalories = calories - protein * 4 - fat * 9;
   const carbs = Math.round(Math.max(50, remainingCalories / 4));

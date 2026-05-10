@@ -12,6 +12,7 @@ import {
   calculateMacroTargets,
   calculateTimeline,
   calculateWaterGoal,
+  type ProteinPreference,
 } from "@/lib/calculations";
 import { getGoalLabel, getActivityLabel, formatDate } from "@/lib/utils";
 import { useDashboard } from "@/store/useDashboard";
@@ -30,8 +31,16 @@ interface FormState {
   goalWeight: string;
   activityLevel: Activity;
   goal: Goal;
+  proteinPreference: ProteinPreference;
   waterGoalOz: string; // empty = auto
 }
+
+const PROTEIN_PREFS: { value: ProteinPreference; label: string; multiplier: string; desc: string; color: string }[] = [
+  { value: "low",      label: "Light",    multiplier: "0.6g / lb", desc: "More budget for carbs & fat · casual dieters",      color: "var(--color-carbs)" },
+  { value: "moderate", label: "Balanced", multiplier: "0.8g / lb", desc: "General recommendation · suits most lifestyles",     color: "var(--color-primary-light)" },
+  { value: "high",     label: "Fitness",  multiplier: "1.0g / lb", desc: "Optimal for fat loss & muscle retention · recommended", color: "var(--color-protein)" },
+  { value: "athletic", label: "Athletic", multiplier: "1.2g / lb", desc: "Maximum protein · serious muscle building",          color: "var(--color-warning)" },
+];
 
 const GOALS: { value: Goal; label: string; desc: string; color: string }[] = [
   { value: "aggressive_loss", label: "Aggressive Loss", desc: "~2 lbs/week · Large deficit", color: "var(--color-danger)" },
@@ -60,6 +69,7 @@ export default function ProfilePage() {
     currentWeight: "", goalWeight: "",
     activityLevel: "moderate",
     goal: "moderate_loss",
+    proteinPreference: "high",
     waterGoalOz: "",
   });
   const [loading, setLoading] = useState(true);
@@ -88,6 +98,7 @@ export default function ProfilePage() {
           goalWeight: p.goalWeight ? String(p.goalWeight) : "",
           activityLevel: (p.activityLevel as Activity) ?? "moderate",
           goal: (p.goal as Goal) ?? "moderate_loss",
+          proteinPreference: (p.proteinPreference as ProteinPreference) ?? "high",
           waterGoalOz: p.waterGoal ? String(Math.round(p.waterGoal / 29.5735)) : "",
         });
         setLoading(false);
@@ -109,7 +120,8 @@ export default function ProfilePage() {
     const bmr = calculateBMR(weightKg, heightCm, age, form.gender);
     const tdee = calculateTDEE(bmr, form.activityLevel);
     const calories = calculateCalorieTarget(tdee, form.goal);
-    const macros = calculateMacroTargets(calories, weightKg, form.goal);
+    const goalWeightKg = gw > 0 ? gw * 0.453592 : undefined;
+    const macros = calculateMacroTargets(calories, weightKg, form.goal, form.proteinPreference, goalWeightKg);
     preview = { bmr: Math.round(bmr), tdee, calories, ...macros };
   }
 
@@ -138,6 +150,7 @@ export default function ProfilePage() {
       gender: form.gender,
       activityLevel: form.activityLevel,
       goal: form.goal,
+      proteinPreference: form.proteinPreference,
     };
     if (age > 0) body.age = age;
     if (heightCm > 0) body.heightCm = heightCm;
@@ -327,6 +340,52 @@ export default function ProfilePage() {
                 {form.goal === value && <CheckCircle2 size={18} color={color} />}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Protein preference */}
+        <div className="card">
+          <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "0.25rem" }}>Protein Target</h3>
+          <p style={{ fontSize: "0.78rem", color: "var(--color-muted)", marginBottom: "1rem" }}>
+            Based on your <strong>goal body weight</strong>{gw > 0 ? ` (${gw} lbs)` : ""} — using goal weight avoids over-prescribing protein while you lose fat
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+            {PROTEIN_PREFS.map(({ value, label, multiplier, desc, color }) => {
+              const proteinG = gw > 0
+                ? Math.round(gw * parseFloat(multiplier))
+                : weight > 0
+                  ? Math.round(weight * parseFloat(multiplier))
+                  : null;
+              return (
+                <button
+                  key={value}
+                  onClick={() => setField("proteinPreference", value)}
+                  style={{
+                    padding: "0.75rem 1rem", borderRadius: "0.625rem", border: "1px solid",
+                    borderColor: form.proteinPreference === value ? color : "var(--color-border)",
+                    backgroundColor: form.proteinPreference === value ? `color-mix(in srgb, ${color} 10%, transparent)` : "transparent",
+                    textAlign: "left", cursor: "pointer", transition: "all 0.15s",
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                  }}
+                >
+                  <div>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: "0.5rem" }}>
+                      <span style={{ fontSize: "0.875rem", fontWeight: 700, color: form.proteinPreference === value ? color : "var(--color-foreground)" }}>{label}</span>
+                      <span style={{ fontSize: "0.78rem", fontWeight: 600, color: form.proteinPreference === value ? color : "var(--color-muted)" }}>{multiplier} goal weight</span>
+                    </div>
+                    <p style={{ fontSize: "0.73rem", color: "var(--color-muted)", marginTop: "0.1rem" }}>{desc}</p>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
+                    {proteinG !== null && (
+                      <span style={{ fontSize: "0.85rem", fontWeight: 700, color: form.proteinPreference === value ? color : "var(--color-muted)" }}>
+                        ~{proteinG}g
+                      </span>
+                    )}
+                    {form.proteinPreference === value && <CheckCircle2 size={16} color={color} />}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 

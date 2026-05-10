@@ -7,6 +7,7 @@ import {
   calculateTDEE,
   calculateCalorieTarget,
   calculateMacroTargets,
+  type ProteinPreference,
 } from "@/lib/calculations";
 import { z } from "zod";
 
@@ -23,6 +24,7 @@ const profileSchema = z.object({
     .enum(["maintain", "lean_bulk", "mild_loss", "moderate_loss", "aggressive_loss"])
     .optional(),
   waterGoal: z.number().int().min(500).max(10000).nullable().optional(),
+  proteinPreference: z.enum(["low", "moderate", "high", "athletic"]).optional(),
 });
 
 export async function GET() {
@@ -97,6 +99,7 @@ export async function PUT(req: NextRequest) {
           | "moderate_loss"
           | "aggressive_loss"
       );
+      const goalWeightKg = merged.goalWeight ? merged.goalWeight * 0.453592 : undefined;
       const macros = calculateMacroTargets(
         calorieTarget,
         weightKg,
@@ -105,7 +108,9 @@ export async function PUT(req: NextRequest) {
           | "lean_bulk"
           | "mild_loss"
           | "moderate_loss"
-          | "aggressive_loss"
+          | "aggressive_loss",
+        (merged.proteinPreference as ProteinPreference | undefined) ?? "high",
+        goalWeightKg,
       );
       calculated = {
         bmr: Math.round(bmr),
