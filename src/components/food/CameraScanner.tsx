@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
-import { X, Camera, RotateCcw, AlertCircle } from "lucide-react";
+import { X, Camera, RotateCcw, AlertCircle, Check } from "lucide-react";
 import { createWorker, type Worker } from "tesseract.js";
 
 export interface ScanResult {
@@ -12,26 +12,80 @@ export interface ScanResult {
   fat: number;
 }
 
-// Grayscale + contrast boost — significantly helps Tesseract on nutrition labels
-function preprocessCanvas(canvas: HTMLCanvasElement): void {
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+interface ReviewData {
+  result: ScanResult;
+  annotatedImage: string;
+}
+
+// ── Image preprocessing ──────────────────────────────────────────────────────
+
+function preprocessForOcr(src: HTMLCanvasElement): HTMLCanvasElement {
+  const dst = document.createElement("canvas");
+  dst.width = src.width;
+  dst.height = src.height;
+  const ctx = dst.getContext("2d")!;
+  ctx.drawImage(src, 0, 0);
+  const img = ctx.getImageData(0, 0, dst.width, dst.height);
   const d = img.data;
   for (let i = 0; i < d.length; i += 4) {
     const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-    // Moderate contrast stretch toward black/white
     const boosted = Math.min(255, Math.max(0, (gray - 128) * 1.6 + 128));
     d[i] = d[i + 1] = d[i + 2] = boosted;
   }
   ctx.putImageData(img, 0, 0);
+  return dst;
 }
 
+// ── Box drawing ──────────────────────────────────────────────────────────────
+
+const NUTRITION_KEYWORDS = [
+  "calorie", "protein", "carbohydrate", "carb", "fat", "energy", "kcal",
+  "sodium", "sugar", "fiber", "cholesterol",
+];
+const HEADER_KEYWORDS = ["nutrition facts", "nutrition information", "supplement facts"];
+
+function drawBoxes(
+  canvas: HTMLCanvasElement,
+  lines: Array<{ text: string; confidence: number; bbox: { x0: number; y0: number; x1: number; y1: number } }>
+): void {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  for (const line of lines) {
+    if (line.confidence < 20 || !line.text.trim()) continue;
+    const { x0, y0, x1, y1 } = line.bbox;
+    const w = x1 - x0;
+    const h = y1 - y0;
+    if (w < 4 || h < 4) continue;
+
+    const text = line.text.toLowerCase();
+    const isHeader = HEADER_KEYWORDS.some((k) => text.includes(k));
+    const isNutrition = NUTRITION_KEYWORDS.some((k) => text.includes(k));
+
+    ctx.lineWidth = isHeader || isNutrition ? 2.5 : 1;
+
+    if (isHeader) {
+      ctx.fillStyle = "rgba(167,139,250,0.18)";
+      ctx.fillRect(x0, y0, w, h);
+      ctx.strokeStyle = "#a78bfa";
+      ctx.strokeRect(x0, y0, w, h);
+    } else if (isNutrition) {
+      ctx.fillStyle = "rgba(16,217,160,0.12)";
+      ctx.fillRect(x0, y0, w, h);
+      ctx.strokeStyle = "#10d9a0";
+      ctx.strokeRect(x0, y0, w, h);
+    } else {
+      ctx.strokeStyle = "rgba(255,255,255,0.28)";
+      ctx.strokeRect(x0, y0, w, h);
+    }
+  }
+}
+
+// ── Text parsing ─────────────────────────────────────────────────────────────
+
 function parseNutritionText(raw: string): ScanResult | null {
-  // Log what Tesseract actually read — useful for diagnosing failures
   console.log("[Nutrition OCR raw]\n", raw);
 
-  // Preserve structure: collapse horizontal whitespace but keep newlines
   const t = raw
     .toLowerCase()
     .replace(/[^a-z0-9.\n]/g, " ")
@@ -52,31 +106,25 @@ function parseNutritionText(raw: string): ScanResult | null {
   }
 
   const calories = extract([
-    /calories\s+(\d+)/,              // "Calories 250"
-    /calori[ae]s\s+(\d+)/,          // OCR typos: "Calories"
+    /calories\s+(\d+)/,
+    /calori[ae]s\s+(\d+)/,
     /energy\s+(\d+)\s*(?:kcal|cal)/,
-    /(\d{2,4})\s*kcal/,             // "250 kcal" — common on EU labels
+    /(\d{2,4})\s*kcal/,
   ]);
-
   const protein = extract([
     /protein\s+(\d+(?:\.\d+)?)/,
-    /proteins?\s*\n\s*(\d+(?:\.\d+)?)/,
+    /protein\s*\n\s*(\d+(?:\.\d+)?)/,
   ]);
-
   const carbs = extract([
     /total\s+carbohydrates?\s+(\d+(?:\.\d+)?)/,
     /total\s+carb\s+(\d+(?:\.\d+)?)/,
     /carbohydrates?\s+(\d+(?:\.\d+)?)/,
-    /carbs?\s+(\d+(?:\.\d+)?)/,
-    // EU labels: "of which sugars" style — grab the "carbohydrate" line
     /carbohydrate\s*\n\s*(\d+(?:\.\d+)?)/,
+    /carbs?\s+(\d+(?:\.\d+)?)/,
   ]);
-
   const fat = extract([
     /total\s+fat\s+(\d+(?:\.\d+)?)/,
     /\bfat\s+(\d+(?:\.\d+)?)\s*g/,
-    /\bfat\s+(\d+(?:\.\d+)?)\s*\n/,
-    // EU labels: "Fat\n12"
     /\bfat\s*\n\s*(\d+(?:\.\d+)?)/,
   ]);
 
@@ -84,12 +132,14 @@ function parseNutritionText(raw: string): ScanResult | null {
   return { calories, protein, carbs, fat };
 }
 
+// ── Component ────────────────────────────────────────────────────────────────
+
 interface CameraScannerProps {
   onFill: (result: ScanResult) => void;
   onClose: () => void;
 }
 
-type Phase = "camera" | "processing" | "error";
+type Phase = "camera" | "processing" | "review" | "error";
 
 export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -99,10 +149,10 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
   const workerReadyRef = useRef(false);
 
   const [phase, setPhase] = useState<Phase>("camera");
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState("Loading scanner…");
   const [progress, setProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState("");
+  const [reviewData, setReviewData] = useState<ReviewData | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -129,7 +179,6 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
         setErrorMsg("Camera access denied. Allow camera permissions and try again.");
       });
 
-    // Tesseract loads in background while user frames the label
     createWorker("eng", 1, {
       logger: (m) => {
         if (!active) return;
@@ -145,7 +194,6 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
     })
       .then(async (worker) => {
         if (!active) { worker.terminate(); return; }
-        // PSM 6 = assume a single uniform block of text — best for nutrition labels
         await worker.setParameters({ tessedit_pageseg_mode: "6" });
         workerRef.current = worker;
         workerReadyRef.current = true;
@@ -174,13 +222,11 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
     if (!ctx) return;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    // Preprocess: grayscale + contrast — improves OCR accuracy significantly
-    preprocessCanvas(canvas);
-
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
-    setCapturedImage(dataUrl);
     streamRef.current?.getTracks().forEach((t) => t.stop());
     setPhase("processing");
+
+    // Keep the color image for annotation; send a preprocessed copy to Tesseract
+    const ocrCanvas = preprocessForOcr(canvas);
 
     if (!workerReadyRef.current) {
       setStatusMsg("Finishing setup…");
@@ -199,27 +245,41 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
 
     try {
       setStatusMsg("Reading label…");
-      const { data } = await workerRef.current.recognize(canvas);
+      const { data } = await workerRef.current.recognize(ocrCanvas);
+
+      // Draw detection boxes on the original color canvas
+      drawBoxes(canvas, data.lines as Parameters<typeof drawBoxes>[1]);
+
       const result = parseNutritionText(data.text);
 
       if (!result) {
+        // Still show the annotated image so the user can see what was detected
+        setReviewData({ result: { calories: 0, protein: 0, carbs: 0, fat: 0 }, annotatedImage: canvas.toDataURL("image/jpeg", 0.92) });
         setPhase("error");
-        setErrorMsg(
-          "Couldn't read the nutrition values. Make sure the label fills the frame and the text is sharp — check the browser console to see what was read."
-        );
+        setErrorMsg("Nutrition values not found — see the highlighted boxes to check what was detected, then retake if needed.");
         return;
       }
 
-      onFill(result);
-      onClose();
+      setReviewData({
+        result,
+        annotatedImage: canvas.toDataURL("image/jpeg", 0.92),
+      });
+      setPhase("review");
     } catch {
       setPhase("error");
       setErrorMsg("OCR failed. Try again with better lighting or a steadier hand.");
     }
   }
 
+  function confirm() {
+    if (reviewData) {
+      onFill(reviewData.result);
+      onClose();
+    }
+  }
+
   function retry() {
-    setCapturedImage(null);
+    setReviewData(null);
     setErrorMsg("");
     setProgress(0);
     setStatusMsg("Ready");
@@ -240,6 +300,8 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
       });
   }
 
+  const r = reviewData?.result;
+
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 200,
@@ -255,7 +317,10 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
         background: "linear-gradient(to bottom, rgba(0,0,0,0.75), transparent)",
       }}>
         <span style={{ color: "white", fontWeight: 600, fontSize: "0.875rem" }}>
-          {phase === "processing" ? statusMsg : "Fill the frame with the label"}
+          {phase === "camera" && "Fill the frame with the label"}
+          {phase === "processing" && statusMsg}
+          {phase === "review" && "Review detected values"}
+          {phase === "error" && "Scan failed"}
         </span>
         <button
           onClick={onClose}
@@ -270,43 +335,37 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
         </button>
       </div>
 
-      {/* Video preview / captured still */}
-      {phase !== "error" && (
+      {/* Camera preview */}
+      {phase === "camera" && (
         <>
           <video
             ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            style={{
-              width: "100%", height: "100%", objectFit: "cover",
-              display: capturedImage ? "none" : "block",
-            }}
+            autoPlay playsInline muted
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
           />
-          {capturedImage && (
-            <img
-              src={capturedImage}
-              alt="Captured frame"
-              style={{ width: "100%", height: "100%", objectFit: "contain" }}
-            />
-          )}
-
-          {/* Targeting reticle — shown only on camera phase */}
-          {!capturedImage && (
+          {/* Targeting reticle */}
+          <div style={{
+            position: "absolute", inset: 0, zIndex: 5,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            pointerEvents: "none",
+          }}>
             <div style={{
-              position: "absolute", inset: 0, zIndex: 5,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              pointerEvents: "none",
-            }}>
-              <div style={{
-                width: "72%", height: "55%",
-                border: "2px solid rgba(255,255,255,0.6)",
-                borderRadius: "0.75rem",
-                boxShadow: "0 0 0 9999px rgba(0,0,0,0.35)",
-              }} />
-            </div>
-          )}
+              width: "78%", height: "52%",
+              border: "2px solid rgba(255,255,255,0.65)",
+              borderRadius: "0.75rem",
+              boxShadow: "0 0 0 9999px rgba(0,0,0,0.38)",
+            }} />
+          </div>
         </>
+      )}
+
+      {/* Annotated image — shown in review and error phases */}
+      {(phase === "review" || phase === "error") && reviewData?.annotatedImage && (
+        <img
+          src={reviewData.annotatedImage}
+          alt="Detected label"
+          style={{ width: "100%", height: "100%", objectFit: "contain" }}
+        />
       )}
 
       {/* Processing overlay */}
@@ -315,7 +374,7 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
           position: "absolute", inset: 0, zIndex: 6,
           display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
           gap: "1.25rem",
-          background: "rgba(0,0,0,0.55)",
+          background: "rgba(0,0,0,0.6)",
         }}>
           <div style={{
             width: 64, height: 64, borderRadius: "50%",
@@ -337,10 +396,8 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
             {progress > 0 && (
               <div style={{ width: 160, height: 4, borderRadius: 99, background: "rgba(255,255,255,0.15)", margin: "0 auto" }}>
                 <div style={{
-                  height: "100%", borderRadius: 99,
-                  background: "#a78bfa",
-                  width: `${progress}%`,
-                  transition: "width 0.2s",
+                  height: "100%", borderRadius: 99, background: "#a78bfa",
+                  width: `${progress}%`, transition: "width 0.2s",
                 }} />
               </div>
             )}
@@ -348,15 +405,91 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
         </div>
       )}
 
+      {/* Review bottom card */}
+      {phase === "review" && r && (
+        <div style={{
+          position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 10,
+          background: "rgba(22,27,39,0.97)",
+          borderTop: "1px solid rgba(255,255,255,0.1)",
+          borderRadius: "1.25rem 1.25rem 0 0",
+          padding: "1.25rem 1.5rem",
+          paddingBottom: "max(env(safe-area-inset-bottom), 1.25rem)",
+        }}>
+          {/* Legend */}
+          <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem", fontSize: "0.7rem", color: "rgba(255,255,255,0.5)" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+              <span style={{ width: 10, height: 10, borderRadius: 2, background: "#10d9a0", display: "inline-block" }} />
+              Nutrition rows
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+              <span style={{ width: 10, height: 10, borderRadius: 2, background: "#a78bfa", display: "inline-block" }} />
+              Label header
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+              <span style={{ width: 10, height: 10, borderRadius: 2, background: "rgba(255,255,255,0.28)", display: "inline-block" }} />
+              Other text
+            </span>
+          </div>
+
+          {/* Detected values */}
+          <p style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "0.625rem" }}>
+            Detected values
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.5rem", marginBottom: "1rem" }}>
+            {[
+              { label: "Calories", value: r.calories, color: "var(--color-calories)", unit: "" },
+              { label: "Protein", value: r.protein, color: "var(--color-protein)", unit: "g" },
+              { label: "Carbs", value: r.carbs, color: "var(--color-carbs)", unit: "g" },
+              { label: "Fat", value: r.fat, color: "var(--color-fat)", unit: "g" },
+            ].map(({ label, value, color, unit }) => (
+              <div key={label} style={{
+                background: "rgba(255,255,255,0.06)", borderRadius: "0.625rem",
+                padding: "0.5rem", textAlign: "center",
+                border: value > 0 ? `1px solid color-mix(in srgb, ${color} 30%, transparent)` : "1px solid rgba(255,255,255,0.08)",
+              }}>
+                <div style={{ fontSize: "1.1rem", fontWeight: 700, color: value > 0 ? color : "rgba(255,255,255,0.25)" }}>
+                  {value > 0 ? `${value}${unit}` : "—"}
+                </div>
+                <div style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.4)", marginTop: "0.15rem" }}>{label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Actions */}
+          <div style={{ display: "flex", gap: "0.625rem" }}>
+            <button
+              onClick={retry}
+              className="btn-ghost"
+              style={{ flex: 1, justifyContent: "center", color: "rgba(255,255,255,0.7)", borderColor: "rgba(255,255,255,0.15)" }}
+            >
+              <RotateCcw size={15} />
+              Retake
+            </button>
+            <button
+              onClick={confirm}
+              className="btn-primary"
+              style={{ flex: 2, justifyContent: "center" }}
+            >
+              <Check size={15} />
+              Use These Values
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Error state */}
       {phase === "error" && (
         <div style={{
-          flex: 1,
-          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-          gap: "1rem", padding: "2.5rem",
+          position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 10,
+          background: "rgba(22,27,39,0.97)",
+          borderTop: "1px solid rgba(255,255,255,0.1)",
+          borderRadius: "1.25rem 1.25rem 0 0",
+          padding: "1.5rem",
+          paddingBottom: "max(env(safe-area-inset-bottom), 1.5rem)",
+          display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem",
         }}>
-          <AlertCircle size={44} color="#ef4444" />
-          <p style={{ color: "white", textAlign: "center", fontSize: "0.875rem", lineHeight: 1.6 }}>
+          <AlertCircle size={36} color="#ef4444" />
+          <p style={{ color: "rgba(255,255,255,0.8)", textAlign: "center", fontSize: "0.85rem", lineHeight: 1.6 }}>
             {errorMsg}
           </p>
           <button
@@ -380,8 +513,8 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
           background: "linear-gradient(to top, rgba(0,0,0,0.65), transparent)",
           gap: "0.75rem",
         }}>
-          <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.75rem" }}>
-            Hold steady — keep label sharp
+          <p style={{ color: "rgba(255,255,255,0.55)", fontSize: "0.75rem" }}>
+            Hold steady — keep label sharp and in frame
           </p>
           <button
             onClick={capture}
