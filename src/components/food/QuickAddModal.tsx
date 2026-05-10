@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { X, Loader2, Zap } from "lucide-react";
+import { X, Loader2, Zap, Camera } from "lucide-react";
 import { useDashboard } from "@/store/useDashboard";
+import { CameraScanner, type ScanResult } from "./CameraScanner";
 
 type Meal = "breakfast" | "lunch" | "dinner" | "snacks";
 
@@ -29,6 +30,7 @@ export function QuickAddModal({ meal, date, onClose, onAdded }: QuickAddModalPro
   const [fat, setFat] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showScanner, setShowScanner] = useState(false);
   const { optimisticAddCalories, fetch: refetch } = useDashboard();
 
   const cal = parseFloat(calories) || 0;
@@ -39,6 +41,14 @@ export function QuickAddModal({ meal, date, onClose, onAdded }: QuickAddModalPro
   // Warn if entered macros' calories deviate >10% from stated calories
   const macroCals = pro * 4 + carb * 4 + f * 9;
   const calMismatch = cal > 0 && macroCals > 0 && Math.abs(macroCals - cal) / cal > 0.1;
+
+  function handleScanFill(result: ScanResult) {
+    if (result.label) setLabel(result.label);
+    setCalories(result.calories > 0 ? String(result.calories) : "");
+    setProtein(result.protein > 0 ? String(result.protein) : "");
+    setCarbs(result.carbs > 0 ? String(result.carbs) : "");
+    setFat(result.fat > 0 ? String(result.fat) : "");
+  }
 
   async function handleAdd() {
     if (cal <= 0) { setError("Calories are required."); return; }
@@ -74,126 +84,155 @@ export function QuickAddModal({ meal, date, onClose, onAdded }: QuickAddModalPro
   }
 
   return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 100,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      backgroundColor: "rgba(0,0,0,0.65)", backdropFilter: "blur(5px)",
-      padding: "1rem",
-    }}>
-      <div className="card" style={{ width: "100%", maxWidth: "440px", boxShadow: "0 30px 80px rgba(0,0,0,0.6)" }}>
+    <>
+      <div style={{
+        position: "fixed", inset: 0, zIndex: 100,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        backgroundColor: "rgba(0,0,0,0.65)", backdropFilter: "blur(5px)",
+        padding: "1rem",
+      }}>
+        <div className="card" style={{ width: "100%", maxWidth: "440px", boxShadow: "0 30px 80px rgba(0,0,0,0.6)" }}>
 
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <Zap size={18} color="var(--color-primary-light)" />
-            <h3 style={{ fontSize: "1rem", fontWeight: 700 }}>Quick Add</h3>
-            <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--color-primary-light)", backgroundColor: "color-mix(in srgb, var(--color-primary) 15%, transparent)", padding: "1px 6px", borderRadius: "99px" }}>
-              NO FOOD ITEM NEEDED
-            </span>
-          </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-muted)" }}>
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Optional label */}
-        <div style={{ marginBottom: "1rem" }}>
-          <label className="label">Label <span style={{ textTransform: "none", fontWeight: 400 }}>(optional)</span></label>
-          <input
-            className="input"
-            type="text"
-            placeholder="e.g. Homemade pasta, Restaurant meal…"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-          />
-        </div>
-
-        {/* Macro inputs */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1rem" }}>
-          <div style={{ gridColumn: "1 / -1" }}>
-            <label className="label" style={{ color: "var(--color-calories)" }}>Calories <span style={{ color: "var(--color-danger)" }}>*</span></label>
-            <input
-              className="input"
-              type="number"
-              min="0"
-              placeholder="0"
-              value={calories}
-              onChange={(e) => setCalories(e.target.value)}
-              autoFocus
-            />
-          </div>
-          <div>
-            <label className="label" style={{ color: "var(--color-protein)" }}>Protein (g)</label>
-            <input className="input" type="number" min="0" placeholder="0" value={protein} onChange={(e) => setProtein(e.target.value)} />
-          </div>
-          <div>
-            <label className="label" style={{ color: "var(--color-carbs)" }}>Carbs (g)</label>
-            <input className="input" type="number" min="0" placeholder="0" value={carbs} onChange={(e) => setCarbs(e.target.value)} />
-          </div>
-          <div>
-            <label className="label" style={{ color: "var(--color-fat)" }}>Fat (g)</label>
-            <input className="input" type="number" min="0" placeholder="0" value={fat} onChange={(e) => setFat(e.target.value)} />
-          </div>
-
-          {/* Live macro-calorie check */}
-          {macroCals > 0 && (
-            <div style={{
-              gridColumn: "1 / -1",
-              padding: "0.5rem 0.75rem", borderRadius: "0.5rem",
-              backgroundColor: calMismatch
-                ? "color-mix(in srgb, var(--color-warning) 12%, transparent)"
-                : "color-mix(in srgb, var(--color-success) 10%, transparent)",
-              border: `1px solid color-mix(in srgb, ${calMismatch ? "var(--color-warning)" : "var(--color-success)"} 25%, transparent)`,
-              fontSize: "0.75rem",
-              color: calMismatch ? "var(--color-warning)" : "var(--color-success)",
-            }}>
-              {calMismatch
-                ? `⚠ Macros add up to ~${Math.round(macroCals)} kcal — double-check your numbers`
-                : `✓ Macros add up to ~${Math.round(macroCals)} kcal`}
+          {/* Header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <Zap size={18} color="var(--color-primary-light)" />
+              <h3 style={{ fontSize: "1rem", fontWeight: 700 }}>Quick Add</h3>
+              <span style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--color-primary-light)", backgroundColor: "color-mix(in srgb, var(--color-primary) 15%, transparent)", padding: "1px 6px", borderRadius: "99px" }}>
+                NO FOOD ITEM NEEDED
+              </span>
             </div>
-          )}
-        </div>
-
-        {/* Meal selector */}
-        <div style={{ marginBottom: "1.25rem" }}>
-          <label className="label">Meal</label>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.5rem" }}>
-            {MEALS.map(({ key, label: mLabel, emoji }) => (
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
               <button
-                key={key}
-                onClick={() => setSelectedMeal(key)}
+                onClick={() => setShowScanner(true)}
+                title="Scan nutrition label"
                 style={{
-                  padding: "0.5rem 0.25rem", borderRadius: "0.5rem", border: "1px solid",
-                  borderColor: selectedMeal === key ? "var(--color-primary)" : "var(--color-border)",
-                  backgroundColor: selectedMeal === key ? "color-mix(in srgb, var(--color-primary) 15%, transparent)" : "transparent",
-                  cursor: "pointer", fontSize: "0.72rem", fontWeight: 600,
-                  color: selectedMeal === key ? "var(--color-primary-light)" : "var(--color-muted)",
-                  display: "flex", flexDirection: "column", alignItems: "center", gap: "0.25rem",
+                  background: "color-mix(in srgb, var(--color-primary) 12%, transparent)",
+                  border: "1px solid color-mix(in srgb, var(--color-primary) 30%, transparent)",
+                  borderRadius: "0.5rem",
+                  padding: "0.375rem 0.625rem",
+                  cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: "0.375rem",
+                  color: "var(--color-primary-light)",
+                  fontSize: "0.75rem", fontWeight: 600,
                   transition: "all 0.15s",
                 }}
               >
-                <span style={{ fontSize: "1rem" }}>{emoji}</span>
-                {mLabel}
+                <Camera size={15} />
+                Scan
               </button>
-            ))}
+              <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-muted)" }}>
+                <X size={18} />
+              </button>
+            </div>
           </div>
+
+          {/* Optional label */}
+          <div style={{ marginBottom: "1rem" }}>
+            <label className="label">Label <span style={{ textTransform: "none", fontWeight: 400 }}>(optional)</span></label>
+            <input
+              className="input"
+              type="text"
+              placeholder="e.g. Homemade pasta, Restaurant meal…"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+            />
+          </div>
+
+          {/* Macro inputs */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1rem" }}>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <label className="label" style={{ color: "var(--color-calories)" }}>Calories <span style={{ color: "var(--color-danger)" }}>*</span></label>
+              <input
+                className="input"
+                type="number"
+                min="0"
+                placeholder="0"
+                value={calories}
+                onChange={(e) => setCalories(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="label" style={{ color: "var(--color-protein)" }}>Protein (g)</label>
+              <input className="input" type="number" min="0" placeholder="0" value={protein} onChange={(e) => setProtein(e.target.value)} />
+            </div>
+            <div>
+              <label className="label" style={{ color: "var(--color-carbs)" }}>Carbs (g)</label>
+              <input className="input" type="number" min="0" placeholder="0" value={carbs} onChange={(e) => setCarbs(e.target.value)} />
+            </div>
+            <div>
+              <label className="label" style={{ color: "var(--color-fat)" }}>Fat (g)</label>
+              <input className="input" type="number" min="0" placeholder="0" value={fat} onChange={(e) => setFat(e.target.value)} />
+            </div>
+
+            {/* Live macro-calorie check */}
+            {macroCals > 0 && (
+              <div style={{
+                gridColumn: "1 / -1",
+                padding: "0.5rem 0.75rem", borderRadius: "0.5rem",
+                backgroundColor: calMismatch
+                  ? "color-mix(in srgb, var(--color-warning) 12%, transparent)"
+                  : "color-mix(in srgb, var(--color-success) 10%, transparent)",
+                border: `1px solid color-mix(in srgb, ${calMismatch ? "var(--color-warning)" : "var(--color-success)"} 25%, transparent)`,
+                fontSize: "0.75rem",
+                color: calMismatch ? "var(--color-warning)" : "var(--color-success)",
+              }}>
+                {calMismatch
+                  ? `⚠ Macros add up to ~${Math.round(macroCals)} kcal — double-check your numbers`
+                  : `✓ Macros add up to ~${Math.round(macroCals)} kcal`}
+              </div>
+            )}
+          </div>
+
+          {/* Meal selector */}
+          <div style={{ marginBottom: "1.25rem" }}>
+            <label className="label">Meal</label>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.5rem" }}>
+              {MEALS.map(({ key, label: mLabel, emoji }) => (
+                <button
+                  key={key}
+                  onClick={() => setSelectedMeal(key)}
+                  style={{
+                    padding: "0.5rem 0.25rem", borderRadius: "0.5rem", border: "1px solid",
+                    borderColor: selectedMeal === key ? "var(--color-primary)" : "var(--color-border)",
+                    backgroundColor: selectedMeal === key ? "color-mix(in srgb, var(--color-primary) 15%, transparent)" : "transparent",
+                    cursor: "pointer", fontSize: "0.72rem", fontWeight: 600,
+                    color: selectedMeal === key ? "var(--color-primary-light)" : "var(--color-muted)",
+                    display: "flex", flexDirection: "column", alignItems: "center", gap: "0.25rem",
+                    transition: "all 0.15s",
+                  }}
+                >
+                  <span style={{ fontSize: "1rem" }}>{emoji}</span>
+                  {mLabel}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {error && (
+            <p style={{ fontSize: "0.8rem", color: "var(--color-danger)", marginBottom: "0.75rem" }}>{error}</p>
+          )}
+
+          <button
+            className="btn-primary"
+            onClick={handleAdd}
+            disabled={loading || cal <= 0}
+            style={{ width: "100%", justifyContent: "center", padding: "0.75rem" }}
+          >
+            {loading && <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />}
+            {loading ? "Adding…" : `Add to ${MEALS.find(m => m.key === selectedMeal)?.label}`}
+          </button>
         </div>
-
-        {error && (
-          <p style={{ fontSize: "0.8rem", color: "var(--color-danger)", marginBottom: "0.75rem" }}>{error}</p>
-        )}
-
-        <button
-          className="btn-primary"
-          onClick={handleAdd}
-          disabled={loading || cal <= 0}
-          style={{ width: "100%", justifyContent: "center", padding: "0.75rem" }}
-        >
-          {loading && <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />}
-          {loading ? "Adding…" : `Add to ${MEALS.find(m => m.key === selectedMeal)?.label}`}
-        </button>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
+
+      {showScanner && (
+        <CameraScanner
+          onFill={handleScanFill}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
+    </>
   );
 }
