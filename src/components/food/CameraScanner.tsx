@@ -129,10 +129,9 @@ function parseNutritionText(raw: string): ScanResult | null {
     /protein\s*\n\s*(\d+(?:\.\d+)?)/,
   ]);
   const carbs = extract([
-    /total\s+carbohydrates?\s+(\d+(?:\.\d+)?)/,
-    /total\s+carb\s+(\d+(?:\.\d+)?)/,
-    /carbohydrates?\s+(\d+(?:\.\d+)?)/,
-    /carbohydrate\s*\n\s*(\d+(?:\.\d+)?)/,
+    /total\s+carbohydrates?\s*(\d+(?:\.\d+)?)/,   // handles merged "Carbohydrate17"
+    /total\s+carb\s*(\d+(?:\.\d+)?)/,
+    /carbohydrates?\s*(\d+(?:\.\d+)?)/,
     /carbs?\s+(\d+(?:\.\d+)?)/,
   ]);
   const fat = extract([
@@ -303,6 +302,11 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
     if (!video || !canvas || video.videoWidth === 0) return;
 
     liveActiveRef.current = false; // stop live scan
+
+    // Wait for any in-flight live scan to release the worker before we use it
+    while (liveBusyRef.current) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
 
     const maxDim = 1280;
     const scale = Math.min(maxDim / video.videoWidth, maxDim / video.videoHeight, 1);
