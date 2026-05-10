@@ -94,12 +94,13 @@ function parseNutritionText(raw: string): ScanResult | null {
 
   console.log("[Nutrition OCR normalized]\n", t);
 
+  let matched = 0;
   function extract(patterns: RegExp[]): number {
     for (const p of patterns) {
       const m = t.match(p);
       if (m?.[1]) {
         const v = parseFloat(m[1]);
-        if (!isNaN(v) && v >= 0) return v;
+        if (!isNaN(v) && v >= 0) { matched++; return v; }
       }
     }
     return 0;
@@ -128,7 +129,8 @@ function parseNutritionText(raw: string): ScanResult | null {
     /\bfat\s*\n\s*(\d+(?:\.\d+)?)/,
   ]);
 
-  if (calories === 0 && protein === 0 && carbs === 0 && fat === 0) return null;
+  // Return null only if no pattern matched at all (OCR found no nutrition text)
+  if (matched === 0) return null;
   return { calories, protein, carbs, fat };
 }
 
