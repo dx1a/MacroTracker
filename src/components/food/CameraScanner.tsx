@@ -447,10 +447,10 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
               <div key={label} style={{
                 background: "rgba(255,255,255,0.06)", borderRadius: "0.625rem",
                 padding: "0.5rem", textAlign: "center",
-                border: value > 0 ? `1px solid color-mix(in srgb, ${color} 30%, transparent)` : "1px solid rgba(255,255,255,0.08)",
+                border: `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
               }}>
-                <div style={{ fontSize: "1.1rem", fontWeight: 700, color: value > 0 ? color : "rgba(255,255,255,0.25)" }}>
-                  {value > 0 ? `${value}${unit}` : "—"}
+                <div style={{ fontSize: "1.1rem", fontWeight: 700, color }}>
+                  {`${value}${unit}`}
                 </div>
                 <div style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.4)", marginTop: "0.15rem" }}>{label}</div>
               </div>
