@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState } from "react";
 import { X, Camera, RotateCcw, AlertCircle, Check } from "lucide-react";
-import { createWorker, type Worker } from "tesseract.js";
+import { createWorker, PSM, type Worker } from "tesseract.js";
 
 export interface ScanResult {
   label?: string;
@@ -194,7 +194,7 @@ export function CameraScanner({ onFill, onClose }: CameraScannerProps) {
     })
       .then(async (worker) => {
         if (!active) { worker.terminate(); return; }
-        await worker.setParameters({ tessedit_pageseg_mode: "6" });
+        await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_BLOCK });
         workerRef.current = worker;
         workerReadyRef.current = true;
         setStatusMsg("Ready");
