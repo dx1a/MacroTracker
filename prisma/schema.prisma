@@ -87,6 +87,13 @@ model FoodLog {
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
 
+  // Condensed totals — populated when entries older than 90 days are rolled up
+  condensedCalories Int?
+  condensedProtein  Float?
+  condensedCarbs    Float?
+  condensedFat      Float?
+  condensedAt       DateTime?
+
   @@unique([userId, date])
   @@index([userId, date])
 }

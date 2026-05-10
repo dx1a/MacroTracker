@@ -25,8 +25,20 @@ export async function POST(req: NextRequest) {
     const data = schema.parse(body);
 
     const entry = await prisma.$transaction(async (tx) => {
-      // Create a one-off food record owned by this user
-      const food = await tx.food.create({
+      // Reuse an existing identical custom food to avoid orphan accumulation
+      const existingFood = await tx.food.findFirst({
+        where: {
+          userId: session.user.id,
+          isCustom: true,
+          name: data.name,
+          calories: data.calories,
+          protein: data.protein,
+          carbs: data.carbs,
+          fat: data.fat,
+        },
+      });
+
+      const food = existingFood ?? await tx.food.create({
         data: {
           name: data.name,
           calories: data.calories,

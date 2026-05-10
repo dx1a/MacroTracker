@@ -126,5 +126,18 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  // Prune: keep at most 52 records (1 year) per user
+  const overflow = await prisma.weeklyCheckIn.findMany({
+    where: { userId: uid },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
+    skip: 52,
+  });
+  if (overflow.length > 0) {
+    await prisma.weeklyCheckIn.deleteMany({
+      where: { id: { in: overflow.map(c => c.id) } },
+    });
+  }
+
   return NextResponse.json({ ok: true, caloriesAfter });
 }

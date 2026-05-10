@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, ChevronLeft, ChevronRight, PlusCircle, Zap } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, ChevronRight, PlusCircle, Zap, Archive } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { FoodSearch } from "@/components/food/FoodSearch";
 import { AddFoodModal } from "@/components/food/AddFoodModal";
@@ -71,6 +71,7 @@ export default function LogPage() {
 
   const [date, setDate] = useState(todayStr());
   const [entries, setEntries] = useState<LogEntry[]>([]);
+  const [condensed, setCondensed] = useState<{ calories: number; protein: number; carbs: number; fat: number } | null>(null);
   const [loadingLog, setLoadingLog] = useState(true);
   const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
   const [activeMeal, setActiveMeal] = useState<Meal>("breakfast");
@@ -92,7 +93,19 @@ export default function LogPage() {
     try {
       const res = await fetch(`/api/logs?date=${date}`);
       const data = await res.json();
-      setEntries(data?.entries ?? []);
+      const liveEntries = data?.entries ?? [];
+      setEntries(liveEntries);
+      // If the log has been condensed and has no live entries, use stored totals
+      if (data?.condensedAt && liveEntries.length === 0) {
+        setCondensed({
+          calories: data.condensedCalories ?? 0,
+          protein:  data.condensedProtein  ?? 0,
+          carbs:    data.condensedCarbs    ?? 0,
+          fat:      data.condensedFat      ?? 0,
+        });
+      } else {
+        setCondensed(null);
+      }
     } finally {
       setLoadingLog(false);
     }
@@ -106,10 +119,12 @@ export default function LogPage() {
     if (date === todayStr()) refetchDashboard();
   }
 
-  const totals = entries.reduce(
-    (acc, e) => ({ cal: acc.cal + e.calories, p: acc.p + e.protein, c: acc.c + e.carbs, f: acc.f + e.fat }),
-    { cal: 0, p: 0, c: 0, f: 0 }
-  );
+  const totals = condensed
+    ? { cal: condensed.calories, p: condensed.protein, c: condensed.carbs, f: condensed.fat }
+    : entries.reduce(
+        (acc, e) => ({ cal: acc.cal + e.calories, p: acc.p + e.protein, c: acc.c + e.carbs, f: acc.f + e.fat }),
+        { cal: 0, p: 0, c: 0, f: 0 }
+      );
 
   const mealEntries = (meal: Meal) => entries.filter((e) => e.meal === meal);
   const mealTotal = (meal: Meal) =>
@@ -234,6 +249,26 @@ export default function LogPage() {
         {loadingLog ? (
           <div style={{ textAlign: "center", padding: "2rem", color: "var(--color-muted)", fontSize: "0.875rem" }}>
             Loading log…
+          </div>
+        ) : condensed ? (
+          <div className="card" style={{ textAlign: "center", padding: "2rem 1.5rem", color: "var(--color-muted)" }}>
+            <Archive size={28} style={{ margin: "0 auto 0.875rem", opacity: 0.45 }} />
+            <p style={{ fontWeight: 600, fontSize: "0.9rem", marginBottom: "0.375rem" }}>Log archived</p>
+            <p style={{ fontSize: "0.82rem", marginBottom: "1.25rem" }}>
+              Individual meal entries older than 90 days are condensed to save storage.
+              Daily totals are preserved above.
+            </p>
+            <div style={{ display: "flex", justifyContent: "center", gap: "1.25rem", fontSize: "0.8rem" }}>
+              {[
+                { label: "Protein", value: condensed.protein, color: "var(--color-protein)" },
+                { label: "Carbs",   value: condensed.carbs,   color: "var(--color-carbs)"   },
+                { label: "Fat",     value: condensed.fat,      color: "var(--color-fat)"     },
+              ].map(({ label, value, color }) => (
+                <span key={label} style={{ fontWeight: 600, color }}>
+                  {label}: {value}g
+                </span>
+              ))}
+            </div>
           </div>
         ) : (
           MEALS.map(({ key, label, emoji }) => {

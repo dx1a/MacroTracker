@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -27,11 +27,20 @@ export default function DashboardPage() {
   const router = useRouter();
   const { data, loading, fetch } = useDashboard();
   const todayStr = localDateStr();
+  const condensedRef = useRef(false);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
     if (status === "authenticated") fetch();
   }, [status, router, fetch]);
+
+  // Fire-and-forget condensation once per session after data loads
+  useEffect(() => {
+    if (data && !condensedRef.current) {
+      condensedRef.current = true;
+      window.fetch("/api/maintenance/condense", { method: "POST" }).catch(() => {});
+    }
+  }, [data]);
 
   if (status === "loading" || loading) return <AppLayout><DashboardSkeleton /></AppLayout>;
   if (!data) return null;

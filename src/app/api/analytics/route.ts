@@ -46,31 +46,32 @@ export async function GET(req: NextRequest) {
     smoothed: Math.round(smoothed[i] * 10) / 10,
   }));
 
+  // Helper: use live entries if present, fall back to condensed totals
+  function logCal(log: typeof foodLogs[0])     { return log.entries.length > 0 ? log.entries.reduce((s, e) => s + e.calories, 0) : (log.condensedCalories ?? 0); }
+  function logProtein(log: typeof foodLogs[0]) { return log.entries.length > 0 ? log.entries.reduce((s, e) => s + e.protein,  0) : (log.condensedProtein  ?? 0); }
+  function logCarbs(log: typeof foodLogs[0])   { return log.entries.length > 0 ? log.entries.reduce((s, e) => s + e.carbs,    0) : (log.condensedCarbs    ?? 0); }
+  function logFat(log: typeof foodLogs[0])     { return log.entries.length > 0 ? log.entries.reduce((s, e) => s + e.fat,      0) : (log.condensedFat      ?? 0); }
+
   // Calorie history
   const calorieHistory = foodLogs.map((log) => ({
     date: format(new Date(log.date), "MMM d"),
-    calories: Math.round(
-      log.entries.reduce((s, e) => s + e.calories, 0)
-    ),
+    calories: Math.round(logCal(log)),
     target: calorieTarget,
   }));
 
   // Macro history
   const macroHistory = foodLogs.map((log) => ({
     date: format(new Date(log.date), "MMM d"),
-    protein: Math.round(log.entries.reduce((s, e) => s + e.protein, 0)),
-    carbs: Math.round(log.entries.reduce((s, e) => s + e.carbs, 0)),
-    fat: Math.round(log.entries.reduce((s, e) => s + e.fat, 0)),
+    protein: Math.round(logProtein(log)),
+    carbs:   Math.round(logCarbs(log)),
+    fat:     Math.round(logFat(log)),
   }));
 
   // Deficit/surplus history
-  const deficitHistory = foodLogs.map((log) => {
-    const consumed = log.entries.reduce((s, e) => s + e.calories, 0);
-    return {
-      date: format(new Date(log.date), "MMM d"),
-      deficit: Math.round(tdee - consumed),
-    };
-  });
+  const deficitHistory = foodLogs.map((log) => ({
+    date: format(new Date(log.date), "MMM d"),
+    deficit: Math.round(tdee - logCal(log)),
+  }));
 
   // Weekly adherence
   const weeklyMap: Record<string, { scores: number[]; date: Date }> = {};
@@ -78,7 +79,7 @@ export async function GET(req: NextRequest) {
     const weekStart = startOfWeek(new Date(log.date), { weekStartsOn: 1 });
     const key = format(weekStart, "yyyy-MM-dd");
     if (!weeklyMap[key]) weeklyMap[key] = { scores: [], date: weekStart };
-    const consumed = log.entries.reduce((s, e) => s + e.calories, 0);
+    const consumed = logCal(log);
     const ratio = consumed / calorieTarget;
     let score = 25;
     if (ratio >= 0.9 && ratio <= 1.1) score = 100;
